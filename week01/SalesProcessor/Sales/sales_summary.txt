@@ -1,0 +1,8 @@
+Sales Summary
+----------------------------
+Total Sales: $839,021.01
+
+Details:
+ DecSales.txt: $6,013.89
+ NovSales.txt: $111,017.75
+ OctSales.txt: $721,989.37
