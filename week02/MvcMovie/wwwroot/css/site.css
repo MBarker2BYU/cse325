@@ -1,31 +1,76 @@
+/* Default font size for smaller screens */
 html {
   font-size: 14px;
 }
 
+/* Increase font size on medium+ screens (responsive design) */
 @media (min-width: 768px) {
   html {
     font-size: 16px;
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+/* Focus styles for buttons and form controls (accessibility + visual feedback) */
+.btn:focus, 
+.btn:active:focus, 
+.btn-link.nav-link:focus, 
+.form-control:focus, 
+.form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
+/* Make sure the page can scroll and footer stays at bottom */
 html {
   position: relative;
   min-height: 100%;
 }
 
 body {
-  margin-bottom: 60px;
+  margin-bottom: 60px; /* Space for footer */
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+/* Form-floating placeholder styling */
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
   text-align: start;
+}
+
+/* Styling for input fields, textareas, and selects in forms */
+input[type="text"],
+input[type="search"],
+select,
+textarea {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+input[type="text"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #80bdff;
+    outline: none;
+}
+
+form p {
+    margin-bottom: 20px;
+}
+
+/* Extra spacing for Edit/Create forms - makes buttons feel less cramped */
+form {
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+form button,
+form input[type="submit"] {
+    margin-top: 15px;
+    padding: 8px 16px;
 }
