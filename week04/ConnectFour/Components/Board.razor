@@ -34,12 +34,29 @@
             </span>
         }
     </div>
-</div>
 
-@for (var i = 0; i < 42; i++)
-{
-    <span class="@pieces[i]"></span>
-}
+    @for (var i = 0; i < 42; i++)
+    {
+        <span class="@pieces[i]"></span>
+    }
+
+    @* Added to display move list *@
+    @if (showMoves)
+    {
+        <div class="modal-backdrop" @onclick="CloseMovesPopup">
+            <div class="modal-content" @onclick:stopPropagation>
+                <h3>Game Moves</h3>
+                <ol>
+                    @foreach (var move in moveHistory)
+                    {
+                        <li>@move</li>
+                    }
+                </ol>
+                <button @onclick="CloseMovesPopup">Close</button>
+            </div>
+        </div>
+    }
+</div>
 
 @code {
 
@@ -50,19 +67,30 @@
     private string CurrentTurn => (winnerMessage == string.Empty) ? $"Player {State.PlayerTurn}'s Turn" : "";
     private string ResetStyle => (winnerMessage == string.Empty) ? "display: none;" : "";
 
-    private void PlayPiece(byte col)
+    //Additional Feature
+    private List<string> moveHistory = new();
+    private bool showMoves = false;
+
+    private async Task PlayPiece(byte col)
     {
         errorMessage = string.Empty;
+
         try
         {
             var player = State.PlayerTurn;
             var turn = State.CurrentTurn;
             var landingRow = State.PlayPiece(col);
+
             pieces[turn] = $"player{player} col{col} drop{landingRow}";
+
+            moveHistory.Add(
+                $"Turn {turn + 1}: Player {player} → Column {col + 1}, Row {landingRow}"
+            );
         }
         catch (ArgumentException ex)
         {
             errorMessage = ex.Message;
+            return;
         }
 
         winnerMessage = State.CheckForWin() switch
@@ -72,6 +100,15 @@
             GameState.WinState.Tie => "It's a tie!",
             _ => ""
         };
+
+        //  If game ended, wait for animation to finish before showing moves
+        if (!string.IsNullOrEmpty(winnerMessage))
+        {
+            // Wait for animation (2 seconds)
+            await Task.Delay(1000);
+            showMoves = true;
+            StateHasChanged();
+        }
     }
 
     protected override void OnInitialized()
@@ -85,5 +122,13 @@
         winnerMessage = string.Empty;
         errorMessage = string.Empty;
         pieces = new string[42];
+
+        moveHistory.Clear();
     }
+
+    private void CloseMovesPopup()
+    {
+        showMoves = false;
+    }
+
 }
