@@ -104,7 +104,7 @@
         //  If game ended, wait for animation to finish before showing moves
         if (!string.IsNullOrEmpty(winnerMessage))
         {
-            // Wait for animation (2 seconds)
+            // Wait for animation (1 seconds)
             await Task.Delay(1000);
             showMoves = true;
             StateHasChanged();
