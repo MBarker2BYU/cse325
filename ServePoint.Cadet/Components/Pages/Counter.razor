@@ -1,19 +1,63 @@
 ﻿@page "/counter"
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = $"{Roles.Instructor},{Roles.Admin}")]
 
 <PageTitle>Counter</PageTitle>
 
 <h1>Counter</h1>
 
-<p role="status">Current count: @currentCount</p>
+@* @if (_authState is null)
+{
+    <p>Loading auth state…</p>
+}
+else
+{
+    var principal = _authState.User;
+
+    <h3>Auth Debug</h3>
+    <p><b>Authenticated:</b> @principal.Identity?.IsAuthenticated</p>
+    <p><b>Name:</b> @principal.Identity?.Name</p>
+    <p><b>IsInRole("User"):</b> @principal.IsInRole(Roles.User)</p>
+
+    <h4>Role Claims</h4>
+    <ul>
+        @foreach (var c in principal.Claims.Where(c => c.Type == ClaimTypes.Role))
+        {
+            <li>@c.Value</li>
+        }
+    </ul>
+
+    <details>
+        <summary>All Claims</summary>
+        <ul>
+            @foreach (var c in principal.Claims)
+            {
+                <li>@c.Type = @c.Value</li>
+            }
+        </ul>
+    </details>
+
+    <hr />
+} *@
+
+<p role="status">Current count: @_currentCount</p>
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
 @code {
-    private int currentCount = 0;
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
-    private void IncrementCount()
+    private AuthenticationState? _authState;
+    private int _currentCount = 0;
+
+    protected override async Task OnInitializedAsync()
     {
-        currentCount++;
+        _authState = await (AuthenticationStateTask
+                            ?? throw new InvalidOperationException("No AuthenticationState found. Make sure AddCascadingAuthenticationState() is registered."));
     }
+
+    private void IncrementCount() => _currentCount++;
 }
