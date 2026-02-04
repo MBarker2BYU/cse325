@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
+using ServePoint.Cadet.Data.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("ServePointCadetContext") ?? throw new InvalidOperationException("Connection string 'ServePointCadetContext' not found.");;
@@ -57,5 +58,11 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAdditionalIdentityEndpoints();;
+
+using (var scope = app.Services.CreateScope())
+{
+    await Roles.SeedAsync(scope.ServiceProvider);
+}
+
 
 app.Run();

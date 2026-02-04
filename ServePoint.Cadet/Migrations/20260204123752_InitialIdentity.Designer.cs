@@ -11,8 +11,8 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ServePointCadetContext))]
-    [Migration("20260204035109_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260204123752_InitialIdentity")]
+    partial class InitialIdentity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
