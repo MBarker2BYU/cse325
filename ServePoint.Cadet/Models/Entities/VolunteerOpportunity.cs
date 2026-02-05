@@ -34,4 +34,12 @@ public class VolunteerOpportunity
 
     // Navigation
     public ICollection<VolunteerSignup> Signups { get; set; } = new List<VolunteerSignup>();
+
+    //Approval
+    public bool IsApproved { get; set; }
+
+    public string? ApprovedByUserId { get; set; }
+
+    public DateTime? ApprovedAt { get; set; }
+
 }

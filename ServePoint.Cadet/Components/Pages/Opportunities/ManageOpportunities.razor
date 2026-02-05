@@ -3,358 +3,943 @@
 
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
-@using ServePoint.Cadet.Models
+@using Microsoft.JSInterop
 @using ServePoint.Cadet.Models.Entities
+@using ServePoint.Cadet.Models.Opportunities
 @using ServePoint.Cadet.Services
 
 @attribute [Authorize(Roles = $"{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")]
 
 @inject OpportunityService Opportunities
+@inject IJSRuntime JS
 
 <PageTitle>Manage Opportunities</PageTitle>
 
-<h1>Manage Opportunities</h1>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Manage Opportunities</h1>
 
-@if (!string.IsNullOrWhiteSpace(_status))
-{
-    <div class="alert alert-info">@_status</div>
-}
-@if (!string.IsNullOrWhiteSpace(_error))
-{
-    <div class="alert alert-danger">@_error</div>
-}
-
-<div class="card mb-3">
-    <div class="card-header">
-        <b>Create New Opportunity</b>
-    </div>
-    <div class="card-body">
-        <EditForm Model="_create" OnValidSubmit="Create">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <label class="form-label">Title</label>
-                    <InputText class="form-control" @bind-Value="_create.Title" />
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Date</label>
-                    <InputDate class="form-control" @bind-Value="_create.Date" />
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label">Hours</label>
-                    <InputNumber class="form-control" @bind-Value="_create.Hours" />
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label">Location</label>
-                    <InputText class="form-control" @bind-Value="_create.Location" />
-                </div>
-
-                <div class="col-12">
-                    <label class="form-label">Description</label>
-                    <InputTextArea class="form-control" @bind-Value="_create.Description" />
-                </div>
-            </div>
-
-            <button class="btn btn-primary mt-3" type="submit" disabled="@_busy">
-                @(_busy ? "Saving..." : "Create")
-            </button>
-        </EditForm>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ToggleCreate" disabled="@(m_Busy)">
+            @(m_ShowCreate ? "Hide Create" : "Create New")
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@(m_Busy)">
+            Refresh
+        </button>
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(m_Status))
+{
+    <div class="alert alert-info">@m_Status</div>
+}
+@if (!string.IsNullOrWhiteSpace(m_Error))
+{
+    <div class="alert alert-danger">@m_Error</div>
+}
+
+@if (m_ShowCreate)
+{
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header">
+            <b>Create New Opportunity</b>
+        </div>
+        <div class="card-body">
+            <EditForm Model="m_Create" OnValidSubmit="Create">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <label class="form-label">Title</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Title" />
+                    </div>
+
+                    <div class="col-lg-3">
+                        <label class="form-label">Date</label>
+                        <InputDate class="form-control" @bind-Value="m_Create.Date" />
+                    </div>
+
+                    <div class="col-lg-2">
+                        <label class="form-label">Hours</label>
+                        <InputNumber class="form-control" @bind-Value="m_Create.Hours" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="m_Create.Description" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Name</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactName" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Email</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactEmail" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Phone</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactPhone" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">Street 1</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Street1" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">Street 2</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Street2" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">City</label>
+                        <InputText class="form-control" @bind-Value="m_Create.City" />
+                    </div>
+
+                    <div class="col-lg-2">
+                        <label class="form-label">State</label>
+                        <InputText class="form-control" @bind-Value="m_Create.State" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Postal Code</label>
+                        <InputText class="form-control" @bind-Value="m_Create.PostalCode" />
+                    </div>
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                        @(m_Busy ? "Saving..." : "Create")
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearCreate" disabled="@(m_Busy)">
+                        Clear
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
 
 <div class="d-flex align-items-center gap-2 mb-2">
-    <input class="form-control" style="max-width: 320px"
-           placeholder="Search title/location..."
-           @bind="_search" @bind:event="oninput" />
-    <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@_busy">Refresh</button>
+    <input class="form-control" style="max-width: 360px"
+           placeholder="Search title/contact/city..."
+           @bind="m_Search" @bind:event="oninput" />
 </div>
 
-@if (_items is null)
+@if (m_Items is null)
 {
     <p>Loading…</p>
 }
-else if (_items.Count == 0)
+else if (m_Items.Count == 0)
 {
     <p>No opportunities yet.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 22%">Title</th>
-                    <th style="width: 14%">Date</th>
-                    <th style="width: 10%">Hours</th>
-                    <th style="width: 18%">Location</th>
-                    <th>Description</th>
-                    <th style="width: 18%">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in Filtered)
-                {
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="table-light">
                     <tr>
-                        @if (_editingId == row.Id)
-                        {
+                        <th style="width: 28%">Title</th>
+                        <th style="width: 12%">Date</th>
+                        <th style="width: 8%">Hours</th>
+                        <th style="width: 10%">Status</th>
+                        <th style="width: 22%">Contact</th>
+                        <th style="width: 12%">City</th>
+                        <th class="text-end" style="width: 8%">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var row in Filtered)
+                    {
+                        var organizerLocked = row.IsApproved && !m_CanEditAfterApproval;
+
+                        <tr>
                             <td>
-                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Title" />
+                                <div class="fw-semibold">@row.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(row.Description))
+                                {
+                                    <div class="text-muted small text-truncate" style="max-width: 520px" title="@row.Description">
+                                        @row.Description
+                                    </div>
+                                }
                             </td>
-                            <td>
-                                <InputDate class="form-control form-control-sm" @bind-Value="_edit.Date" />
-                            </td>
-                            <td>
-                                <InputNumber class="form-control form-control-sm" @bind-Value="_edit.Hours" />
-                            </td>
-                            <td>
-                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Location" />
-                            </td>
-                            <td>
-                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Description" />
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-success" @onclick="SaveEdit" disabled="@_busy">Save</button>
-                                <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit" disabled="@_busy">Cancel</button>
-                            </td>
-                        }
-                        else
-                        {
-                            <td>@row.Title</td>
+
                             <td>@row.Date.ToShortDateString()</td>
                             <td>@row.Hours</td>
-                            <td>@row.Location</td>
-                            <td class="text-truncate" style="max-width: 320px">@row.Description</td>
+
                             <td>
-                                <button class="btn btn-sm btn-outline-primary"
-                                        @onclick="() => BeginEdit(row)"
-                                        disabled="@_busy">
+                                @if (row.IsApproved)
+                                {
+                                    <span class="badge bg-success">Approved</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                }
+                            </td>
+
+                            <td>
+                                <div class="fw-semibold">@row.Contact?.Name</div>
+                                <div class="text-muted small">
+                                    @if (!string.IsNullOrWhiteSpace(row.Contact?.Email))
+                                    {
+                                        <span>@row.Contact!.Email</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(row.Contact?.Phone))
+                                    {
+                                        <span>@(string.IsNullOrWhiteSpace(row.Contact?.Email) ? "" : " • ")@row.Contact!.Phone</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <td class="text-muted">
+                                @row.Contact?.Address?.City
+                            </td>
+
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => OpenDetailsAsync(row)"
+                                        disabled="@(m_Busy)">
+                                    Details
+                                </button>
+
+                                <button class="btn btn-sm btn-outline-primary ms-1"
+                                        title="@(organizerLocked ? "Approved opportunities cannot be edited by organizers" : null)"
+                                        @onclick="() => OpenEditorAsync(row)"
+                                        disabled="@(m_Busy || organizerLocked)">
                                     Edit
                                 </button>
+
                                 <button class="btn btn-sm btn-outline-danger ms-1"
-                                        @onclick="() => Delete(row.Id)"
-                                        disabled="@_busy">
+                                        @onclick="() => ConfirmAndDeleteAsync(row)"
+                                        disabled="@(m_Busy || organizerLocked)">
                                     Delete
                                 </button>
                             </td>
-                        }
-                    </tr>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* ===== Shared Backdrop ===== *@
+@if (m_ShowDetails || m_ShowEditor)
+{
+    <div class="offcanvas-backdrop fade show" @onclick="ClosePanelsAsync"></div>
+}
+
+@* ===== DETAILS PANEL ===== *@
+@if (m_ShowDetails && m_Selected is not null)
+{
+    var organizerLocked = m_Selected.IsApproved && !m_CanEditAfterApproval;
+
+    <div class="offcanvas offcanvas-end show shadow"
+         tabindex="-1"
+         style="visibility: visible; width: min(560px, 92vw); z-index: 1045;"
+         aria-modal="true"
+         role="dialog"
+         @onclick:stopPropagation="true">
+
+        <div class="offcanvas-header border-bottom">
+            <div>
+                <h5 class="offcanvas-title mb-0">Opportunity Details</h5>
+                <div class="text-muted small">
+                    @m_Selected.Title
+                    @if (m_Selected.IsApproved)
+                    {
+                        <span class="badge bg-success ms-2">Approved</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark ms-2">Pending</span>
+                    }
+                </div>
+            </div>
+
+            <button type="button" class="btn-close" aria-label="Close" @onclick="ClosePanelsAsync"></button>
+        </div>
+
+        <div class="offcanvas-body">
+            <div class="mb-3">
+                <div class="text-muted small">Date</div>
+                <div class="fw-semibold">@m_Selected.Date.ToLongDateString()</div>
+            </div>
+
+            <div class="mb-3">
+                <div class="text-muted small">Hours</div>
+                <div class="fw-semibold">@m_Selected.Hours</div>
+                @if (!m_CanEditHours)
+                {
+                    <div class="text-muted small">Only Admin/Instructor can change hours after creation.</div>
                 }
-            </tbody>
-        </table>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(m_Selected.Description))
+            {
+                <div class="mb-3">
+                    <div class="text-muted small">Description</div>
+                    <div>@m_Selected.Description</div>
+                </div>
+            }
+
+            <hr />
+
+            <div class="mb-2 fw-semibold">Contact</div>
+            <div class="mb-2">
+                <div>@m_Selected.Contact?.Name</div>
+                <div class="text-muted small">
+                    @if (!string.IsNullOrWhiteSpace(m_Selected.Contact?.Email))
+                    {
+                        <span>@m_Selected.Contact!.Email</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(m_Selected.Contact?.Phone))
+                    {
+                        <span>@(string.IsNullOrWhiteSpace(m_Selected.Contact?.Email) ? "" : " • ")@m_Selected.Contact!.Phone</span>
+                    }
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="text-muted small">Address</div>
+                @if (m_Selected.Contact?.Address is null)
+                {
+                    <div class="text-muted">None</div>
+                }
+                else
+                {
+                    var a = m_Selected.Contact.Address;
+                    <div>
+                        @a.Street1
+                        @if (!string.IsNullOrWhiteSpace(a.Street2))
+                        {
+                            <span>, @a.Street2</span>
+                        }
+                    </div>
+                    <div>
+                        @a.City, @a.State @a.PostalCode
+                    </div>
+                }
+            </div>
+
+            <hr />
+
+            <div class="d-flex gap-2 flex-wrap">
+                @if (m_CanApprove)
+                {
+                    @if (!m_Selected.IsApproved)
+                    {
+                        <button class="btn btn-outline-success"
+                                @onclick="() => ApproveFromPanelAsync(m_Selected.Id)"
+                                disabled="@(m_Busy)">
+                            Approve
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-outline-warning"
+                                @onclick="() => UnapproveFromPanelAsync(m_Selected.Id)"
+                                disabled="@(m_Busy)">
+                            Unapprove
+                        </button>
+                    }
+                }
+
+                <button class="btn btn-primary"
+                        @onclick="() => OpenEditorAsync(m_Selected!)"
+                        disabled="@(m_Busy || organizerLocked)">
+                    Edit
+                </button>
+
+                <button class="btn btn-outline-danger"
+                        @onclick="() => ConfirmAndDeleteFromPanelAsync(m_Selected!)"
+                        disabled="@(m_Busy || organizerLocked)">
+                    Delete
+                </button>
+
+                <button class="btn btn-outline-secondary ms-auto"
+                        @onclick="ClosePanelsAsync"
+                        disabled="@(m_Busy)">
+                    Close
+                </button>
+            </div>
+
+            @if (organizerLocked)
+            {
+                <div class="alert alert-secondary mt-3 mb-0">
+                    This opportunity is approved. Organizers cannot edit or delete it.
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ===== EDITOR PANEL ===== *@
+@if (m_ShowEditor)
+{
+    <div class="offcanvas offcanvas-end show shadow"
+         tabindex="-1"
+         style="visibility: visible; width: min(560px, 92vw); z-index: 1045;"
+         aria-modal="true"
+         role="dialog"
+         @onclick:stopPropagation="true">
+
+        <div class="offcanvas-header border-bottom">
+            <div>
+                <h5 class="offcanvas-title mb-0">Edit Opportunity</h5>
+                @if (m_EditingRow is not null)
+                {
+                    <div class="text-muted small">
+                        @m_EditingRow.Title
+                        @if (m_EditingRow.IsApproved)
+                        {
+                            <span class="badge bg-success ms-2">Approved</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Pending</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <button type="button" class="btn-close" aria-label="Close" @onclick="ClosePanelsAsync"></button>
+        </div>
+
+        <div class="offcanvas-body">
+            <EditForm Model="m_Edit" OnValidSubmit="SaveEditAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Title</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Title" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Date</label>
+                        <InputDate class="form-control" @bind-Value="m_Edit.Date" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Hours</label>
+                        <InputNumber class="form-control"
+                                     @bind-Value="m_Edit.Hours"
+                                     disabled="@(!m_CanEditHours)" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="m_Edit.Description" />
+                    </div>
+
+                    <hr class="my-2" />
+
+                    <div class="col-12">
+                        <div class="fw-semibold mb-1">Contact</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactName" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactEmail" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactPhone" />
+                    </div>
+
+                    <hr class="my-2" />
+
+                    <div class="col-12">
+                        <div class="fw-semibold mb-1">Address</div>
+                        <div class="text-muted small mb-2">Leave blank if you want no address on the contact.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Street 1</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Street1" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Street 2</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Street2" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">City</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.City" />
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">State</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.State" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Postal Code</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.PostalCode" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                        @(m_Busy ? "Saving..." : "Save")
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ClosePanelsAsync" disabled="@(m_Busy)">
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
     </div>
 }
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
-    private List<VolunteerOpportunity>? _items;
-    private string _search = "";
-    private bool _busy;
-    private string? _status;
-    private string? _error;
+    private List<VolunteerOpportunity>? m_Items;
+    private string m_Search = "";
+    private bool m_Busy;
+    private string? m_Status;
+    private string? m_Error;
 
-    // Create model
-    private CreateModel _create = new();
+    private bool m_ShowCreate;
+    private CreateModel m_Create = new();
 
-    // Inline edit state
-    private int? _editingId;
-    private EditModel _edit = new();
+    private bool m_ShowDetails;
+    private VolunteerOpportunity? m_Selected;
+
+    private bool m_ShowEditor;
+    private VolunteerOpportunity? m_EditingRow;
+    private EditModel m_Edit = new();
+
+    private bool m_CanEditHours;
+    private bool m_CanEditAfterApproval;
+    private bool m_CanApprove;
+
+    private IJSObjectReference? m_EscListener;
+    private DotNetObjectReference<ManageOpportunities>? m_SelfRef;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         await Reload();
     }
 
+    private async Task LoadPermissionsAsync()
+    {
+        var auth = await (AuthenticationStateTask ?? throw new InvalidOperationException("No auth state."));
+        var u = auth.User;
+
+        m_CanEditHours = u.IsInRole(Roles.Admin) || u.IsInRole(Roles.Instructor);
+        m_CanEditAfterApproval = m_CanEditHours;
+        m_CanApprove = m_CanEditHours;
+    }
+
     private IEnumerable<VolunteerOpportunity> Filtered =>
-        string.IsNullOrWhiteSpace(_search)
-            ? _items!
-            : _items!.Where(o =>
-                (o.Title ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                (o.Location ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+        string.IsNullOrWhiteSpace(m_Search)
+            ? (m_Items ?? Enumerable.Empty<VolunteerOpportunity>())
+            : (m_Items ?? Enumerable.Empty<VolunteerOpportunity>())
+                .Where(o =>
+                    (o.Title ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase) ||
+                    (o.Contact?.Name ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase) ||
+                    (o.Contact?.Address?.City ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase));
+
+    private void ToggleCreate() => m_ShowCreate = !m_ShowCreate;
+    private void ClearCreate() => m_Create = new CreateModel();
 
     private async Task Reload()
     {
-        _status = null;
-        _error = null;
-        _editingId = null;
+        m_Status = null;
+        m_Error = null;
 
-        _items = await Opportunities.GetAllAsync();
+        m_Items = await Opportunities.GetAllAsync();
+        await RefreshSelectedFromListAsync();
     }
 
     private async Task Create()
     {
         try
         {
-            _busy = true;
-            _status = null;
-            _error = null;
+            m_Busy = true;
+            m_Status = null;
+            m_Error = null;
 
             var auth = await (AuthenticationStateTask ?? throw new InvalidOperationException("No auth state."));
             var userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (string.IsNullOrWhiteSpace(userId))
             {
-                _error = "Unable to determine current user.";
+                m_Error = "Unable to determine current user.";
                 return;
             }
+
+            var contact = new Contact
+            {
+                Name = m_Create.ContactName.Trim(),
+                Email = string.IsNullOrWhiteSpace(m_Create.ContactEmail) ? null : m_Create.ContactEmail.Trim(),
+                Phone = string.IsNullOrWhiteSpace(m_Create.ContactPhone) ? null : m_Create.ContactPhone.Trim(),
+                Address = new Address
+                {
+                    Street1 = m_Create.Street1.Trim(),
+                    Street2 = string.IsNullOrWhiteSpace(m_Create.Street2) ? null : m_Create.Street2.Trim(),
+                    City = m_Create.City.Trim(),
+                    State = m_Create.State.Trim(),
+                    PostalCode = m_Create.PostalCode.Trim()
+                }
+            };
 
             var entity = new VolunteerOpportunity
             {
-                Title = _create.Title.Trim(),
-                Description = string.IsNullOrWhiteSpace(_create.Description) ? null : _create.Description.Trim(),
-                Date = _create.Date,
-                Location = string.IsNullOrWhiteSpace(_create.Location) ? null : _create.Location.Trim(),
-                Hours = _create.Hours,
+                Title = m_Create.Title.Trim(),
+                Description = string.IsNullOrWhiteSpace(m_Create.Description) ? null : m_Create.Description.Trim(),
+                Date = m_Create.Date,
+                Hours = m_Create.Hours,
                 CreatedByUserId = userId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Contact = contact,
+                IsApproved = false,
+                ApprovedAt = null,
+                ApprovedByUserId = null,
+                Location = null
             };
 
             await Opportunities.CreateAsync(entity);
-            _status = "Opportunity created.";
-            _create = new CreateModel(); // reset
+
+            m_Status = "Opportunity created.";
+            m_Create = new CreateModel();
+            m_ShowCreate = false;
+
             await Reload();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            m_Error = ex.Message;
         }
         finally
         {
-            _busy = false;
+            m_Busy = false;
         }
     }
 
-    private void BeginEdit(VolunteerOpportunity row)
+    private async Task OpenDetailsAsync(VolunteerOpportunity row)
     {
-        _status = null;
-        _error = null;
+        m_Status = null;
+        m_Error = null;
 
-        _editingId = row.Id;
-        _edit = new EditModel
+        m_Selected = row;
+        m_ShowDetails = true;
+        m_ShowEditor = false;
+
+        await RegisterEscAsync();
+    }
+
+    private async Task OpenEditorAsync(VolunteerOpportunity row)
+    {
+        m_Status = null;
+        m_Error = null;
+
+        m_EditingRow = row;
+
+        m_Edit = new EditModel
         {
             Id = row.Id,
-            Title = row.Title,
+            Title = row.Title ?? "",
             Description = row.Description,
             Date = row.Date,
-            Location = row.Location,
-            Hours = row.Hours
+            Hours = row.Hours,
+
+            ContactId = row.ContactId,
+            IsApproved = row.IsApproved,
+
+            ContactName = row.Contact?.Name ?? "",
+            ContactEmail = row.Contact?.Email,
+            ContactPhone = row.Contact?.Phone,
+
+            AddressId = row.Contact?.AddressId,
+            Street1 = row.Contact?.Address?.Street1 ?? "",
+            Street2 = row.Contact?.Address?.Street2,
+            City = row.Contact?.Address?.City ?? "",
+            State = row.Contact?.Address?.State ?? "FL",
+            PostalCode = row.Contact?.Address?.PostalCode ?? ""
         };
+
+        m_ShowEditor = true;
+        m_ShowDetails = false; // editor replaces details
+        m_Selected = null;
+
+        await RegisterEscAsync();
     }
 
-    private void CancelEdit()
+    private async Task ClosePanelsAsync()
     {
-        _editingId = null;
+        m_ShowDetails = false;
+        m_Selected = null;
+
+        m_ShowEditor = false;
+        m_EditingRow = null;
+
+        await UnregisterEscAsync();
+        StateHasChanged();
     }
 
-    private async Task SaveEdit()
+    private async Task SaveEditAsync()
     {
         try
         {
-            _busy = true;
-            _status = null;
-            _error = null;
+            m_Busy = true;
+            m_Status = null;
+            m_Error = null;
 
-            if (_editingId is null)
-                return;
-
-            var updated = new VolunteerOpportunity
+            var updatedOpp = new VolunteerOpportunity
             {
-                Id = _edit.Id,
-                Title = _edit.Title.Trim(),
-                Description = string.IsNullOrWhiteSpace(_edit.Description) ? null : _edit.Description.Trim(),
-                Date = _edit.Date,
-                Location = string.IsNullOrWhiteSpace(_edit.Location) ? null : _edit.Location.Trim(),
-                Hours = _edit.Hours
+                Id = m_Edit.Id,
+                Title = m_Edit.Title.Trim(),
+                Description = string.IsNullOrWhiteSpace(m_Edit.Description) ? null : m_Edit.Description.Trim(),
+                Date = m_Edit.Date,
+                Hours = m_Edit.Hours
             };
 
-            var ok = await Opportunities.UpdateAsync(updated);
+            var updatedContact = new Contact
+            {
+                Id = m_Edit.ContactId,
+                Name = m_Edit.ContactName.Trim(),
+                Email = string.IsNullOrWhiteSpace(m_Edit.ContactEmail) ? null : m_Edit.ContactEmail.Trim(),
+                Phone = string.IsNullOrWhiteSpace(m_Edit.ContactPhone) ? null : m_Edit.ContactPhone.Trim(),
+                AddressId = m_Edit.AddressId
+            };
+
+            Address? updatedAddress = null;
+
+            var hasAnyAddress =
+                !string.IsNullOrWhiteSpace(m_Edit.Street1) ||
+                !string.IsNullOrWhiteSpace(m_Edit.City) ||
+                !string.IsNullOrWhiteSpace(m_Edit.PostalCode);
+
+            if (hasAnyAddress)
+            {
+                updatedAddress = new Address
+                {
+                    Id = m_Edit.AddressId ?? 0,
+                    Street1 = m_Edit.Street1.Trim(),
+                    Street2 = string.IsNullOrWhiteSpace(m_Edit.Street2) ? null : m_Edit.Street2.Trim(),
+                    City = m_Edit.City.Trim(),
+                    State = m_Edit.State.Trim(),
+                    PostalCode = m_Edit.PostalCode.Trim()
+                };
+            }
+
+            var policy = new OpportunityService.OpportunityEditPolicy(
+                CanEditHours: m_CanEditHours,
+                CanEditAfterApproval: m_CanEditAfterApproval
+            );
+
+            var (ok, err) = await Opportunities.UpdateAsync(updatedOpp, updatedContact, updatedAddress, policy);
             if (!ok)
             {
-                _error = "Opportunity not found (may have been deleted).";
+                m_Error = err;
                 return;
             }
 
-            _status = "Saved changes.";
+            m_Status = "Saved changes.";
+            await ClosePanelsAsync();
             await Reload();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            m_Error = ex.Message;
         }
         finally
         {
-            _busy = false;
+            m_Busy = false;
         }
     }
 
-    private async Task Delete(int id)
+    private async Task DeleteAsync(int id)
     {
         try
         {
-            _busy = true;
-            _status = null;
-            _error = null;
+            m_Busy = true;
+            m_Status = null;
+            m_Error = null;
 
             var ok = await Opportunities.DeleteAsync(id);
             if (!ok)
             {
-                _error = "Opportunity not found (may have been deleted).";
+                m_Error = "Opportunity not found (may have been deleted).";
                 return;
             }
 
-            _status = "Opportunity deleted.";
+            m_Status = "Opportunity deleted.";
             await Reload();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            m_Error = ex.Message;
         }
         finally
         {
-            _busy = false;
+            m_Busy = false;
         }
     }
 
-    // public class CreateModel
-    // {
-    //     [Required, MaxLength(100)]
-    //     public string Title { get; set; } = "";
+    private async Task DeleteFromPanelAsync(int id)
+    {
+        await DeleteAsync(id);
+        await ClosePanelsAsync();
+    }
 
-    //     [MaxLength(500)]
-    //     public string? Description { get; set; }
+    private async Task ApproveAsync(int id)
+    {
+        try
+        {
+            m_Busy = true;
+            m_Status = null;
+            m_Error = null;
 
-    //     [Required]
-    //     public DateTime Date { get; set; } = DateTime.Today;
+            var auth = await (AuthenticationStateTask ?? throw new InvalidOperationException("No auth state."));
+            var userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    //     [Range(1, 24)]
-    //     public int Hours { get; set; } = 2;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                m_Error = "Unable to determine current user.";
+                return;
+            }
 
-    //     [MaxLength(200)]
-    //     public string? Location { get; set; }
-    // }
+            var (ok, err) = await Opportunities.ApproveAsync(id, userId);
+            if (!ok) { m_Error = err; return; }
 
-    // public class EditModel
-    // {
-    //     public int Id { get; set; }
+            m_Status = "Opportunity approved.";
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
 
-    //     [Required, MaxLength(100)]
-    //     public string Title { get; set; } = "";
+    private async Task UnapproveAsync(int id)
+    {
+        try
+        {
+            m_Busy = true;
+            m_Status = null;
+            m_Error = null;
 
-    //     [MaxLength(500)]
-    //     public string? Description { get; set; }
+            var auth = await (AuthenticationStateTask ?? throw new InvalidOperationException("No auth state."));
+            var userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    //     [Required]
-    //     public DateTime Date { get; set; } = DateTime.Today;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                m_Error = "Unable to determine current user.";
+                return;
+            }
 
-    //     [Range(1, 24)]
-    //     public int Hours { get; set; }
+            var (ok, err) = await Opportunities.UnapproveAsync(id, userId);
+            if (!ok) { m_Error = err; return; }
 
-    //     [MaxLength(200)]
-    //     public string? Location { get; set; }
-    // }
+            m_Status = "Opportunity unapproved.";
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private async Task ApproveFromPanelAsync(int id)
+    {
+        await ApproveAsync(id);
+        await RefreshSelectedFromListAsync();
+    }
+
+    private async Task UnapproveFromPanelAsync(int id)
+    {
+        await UnapproveAsync(id);
+        await RefreshSelectedFromListAsync();
+    }
+
+    private async Task RefreshSelectedFromListAsync()
+    {
+        // If panels are closed, nothing to sync.
+        if (!m_ShowDetails || m_Selected is null) return;
+
+        if (m_Items is null) return;
+
+        var latest = m_Items.FirstOrDefault(o => o.Id == m_Selected.Id);
+        if (latest is null)
+        {
+            await ClosePanelsAsync();
+            return;
+        }
+
+        m_Selected = latest;
+    }
+
+    [JSInvokable]
+    public async Task OnEscPressed()
+    {
+        await ClosePanelsAsync();
+    }
+
+    private async Task RegisterEscAsync()
+    {
+        if (m_EscListener is not null)
+            return;
+
+        m_SelfRef = DotNetObjectReference.Create(this);
+
+        m_EscListener = await JS.InvokeAsync<IJSObjectReference>(
+            "offcanvasEsc.register",
+            m_SelfRef
+        );
+    }
+
+    private async Task UnregisterEscAsync()
+    {
+        if (m_EscListener is not null)
+        {
+            await m_EscListener.InvokeVoidAsync("dispose");
+            await m_EscListener.DisposeAsync();
+            m_EscListener = null;
+        }
+
+        m_SelfRef?.Dispose();
+        m_SelfRef = null;
+    }
+
+    private async Task<bool> ConfirmDeleteAsync(string title)
+    {
+        // Simple + reliable (uses browser confirm)
+        return await JS.InvokeAsync<bool>("confirm", $"Delete '{title}'? This cannot be undone.");
+    }
+
+    private async Task ConfirmAndDeleteAsync(VolunteerOpportunity row)
+    {
+        if (!await ConfirmDeleteAsync(row.Title))
+            return;
+
+        await DeleteAsync(row.Id);
+    }
+
+    private async Task ConfirmAndDeleteFromPanelAsync(VolunteerOpportunity row)
+    {
+        if (!await ConfirmDeleteAsync(row.Title))
+            return;
+
+        await DeleteAsync(row.Id);
+        await ClosePanelsAsync();
+    }
+
+
 }

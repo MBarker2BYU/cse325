@@ -8,7 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Components\Pages\Counter.razor" />
     <Content Remove="Components\Pages\Home.razor" />
+    <Content Remove="Components\Pages\Weather.razor" />
   </ItemGroup>
 
   <ItemGroup>
