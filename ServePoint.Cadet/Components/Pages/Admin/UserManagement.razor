@@ -55,9 +55,21 @@ else
             {
                 <tr>
                     <td>
-                        <div><b>@(r.Email ?? r.UserName)</b></div>
+                        <div class="d-flex align-items-center gap-2">
+                            <b>@(r.Email ?? r.UserName)</b>
+
+                            @if (AdminSentinel.IsProtectedAdmin(r.Email, Configuration))
+                            {
+                                <span class="badge bg-warning text-dark"
+                                      title="This is the built-in admin account and cannot be demoted from Admin.">
+                                    Protected
+                                </span>
+                            }
+                        </div>
+
                         <div class="text-muted" style="font-size: 0.9em">@r.Id</div>
                     </td>
+
 
                     <td>
                         @if (r.Roles.Count == 0)
