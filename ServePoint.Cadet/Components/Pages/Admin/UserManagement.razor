@@ -11,26 +11,27 @@
 
 @inject UserManager<ServePointCadetUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject IConfiguration Configuration
 
 <PageTitle>User Management</PageTitle>
 
 <h1>User Management</h1>
 
-@if (!string.IsNullOrWhiteSpace(_status))
+@if (!string.IsNullOrWhiteSpace(m_Status))
 {
-    <div class="alert alert-info">@_status</div>
+    <div class="alert alert-info">@m_Status</div>
 }
 
-@if (!string.IsNullOrWhiteSpace(_error))
+@if (!string.IsNullOrWhiteSpace(m_Error))
 {
-    <div class="alert alert-danger">@_error</div>
+    <div class="alert alert-danger">@m_Error</div>
 }
 
-@if (_rows is null)
+@if (m_Rows is null)
 {
     <p>Loading users…</p>
 }
-else if (_rows.Count == 0)
+else if (m_Rows.Count == 0)
 {
     <p>No users found.</p>
 }
@@ -38,7 +39,7 @@ else
 {
     <div class="mb-3">
         <input class="form-control" placeholder="Search email/username..."
-               @bind="_search" @bind:event="oninput" />
+               @bind="m_Search" @bind:event="oninput" />
     </div>
 
     <table class="table table-sm align-middle">
@@ -92,11 +93,19 @@ else
                             <select class="form-select form-select-sm" style="width: 160px"
                                     @bind="r.SelectedRoleToRemove">
                                 <option value="">Remove role…</option>
+
                                 @foreach (var role in r.Roles.OrderBy(x => x))
                                 {
+                                    // Hide Admin removal option for the protected admin account
+                                    if (role == Roles.Admin && (r.Email ?? "").Equals(AdminSentinel.GetProtectedAdminEmail(Configuration), StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        continue;
+                                    }
+
                                     <option value="@role">@role</option>
                                 }
                             </select>
+
 
                             <button class="btn btn-sm btn-outline-danger"
                                     disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
@@ -112,10 +121,10 @@ else
 }
 
 @code {
-    private List<UserRow>? _rows;
-    private string _search = "";
-    private string? _status;
-    private string? _error;
+    private List<UserRow>? m_Rows;
+    private string m_Search = "";
+    private string? m_Status;
+    private string? m_Error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -123,16 +132,16 @@ else
     }
 
     private IEnumerable<UserRow> FilteredRows =>
-        string.IsNullOrWhiteSpace(_search)
-            ? _rows!
-            : _rows!.Where(r =>
-                (r.Email ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                (r.UserName ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+        string.IsNullOrWhiteSpace(m_Search)
+            ? m_Rows!
+            : m_Rows!.Where(r =>
+                (r.Email ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase) ||
+                (r.UserName ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase));
 
     private async Task LoadAsync()
     {
-        _status = null;
-        _error = null;
+        m_Status = null;
+        m_Error = null;
 
         // Ensure roles exist (defensive)
         foreach (var role in Roles.All)
@@ -161,45 +170,45 @@ else
             });
         }
 
-        _rows = rows;
+        m_Rows = rows;
     }
 
     private async Task AddRole(string userId, string role)
     {
         try
         {
-            _status = null;
-            _error = null;
+            m_Status = null;
+            m_Error = null;
 
             var user = await UserManager.FindByIdAsync(userId);
-            if (user is null) { _error = "User not found."; return; }
+            if (user is null) { m_Error = "User not found."; return; }
 
             if (!await RoleManager.RoleExistsAsync(role))
             {
-                _error = $"Role '{role}' does not exist.";
+                m_Error = $"Role '{role}' does not exist.";
                 return;
             }
 
             // Prevent removing your own Admin later? (optional; we’ll handle in RemoveRole)
             if (await UserManager.IsInRoleAsync(user, role))
             {
-                _status = $"User already has role '{role}'.";
+                m_Status = $"User already has role '{role}'.";
                 return;
             }
 
             var result = await UserManager.AddToRoleAsync(user, role);
             if (!result.Succeeded)
             {
-                _error = string.Join(" | ", result.Errors.Select(e => e.Description));
+                m_Error = string.Join(" | ", result.Errors.Select(e => e.Description));
                 return;
             }
 
-            _status = $"Added '{role}' to {(user.Email ?? user.UserName)}.";
+            m_Status = $"Added '{role}' to {(user.Email ?? user.UserName)}.";
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            m_Error = ex.Message;
         }
     }
 
@@ -207,11 +216,11 @@ else
     {
         try
         {
-            _status = null;
-            _error = null;
+            m_Status = null;
+            m_Error = null;
 
             var user = await UserManager.FindByIdAsync(userId);
-            if (user is null) { _error = "User not found."; return; }
+            if (user is null) { m_Error = "User not found."; return; }
 
             // Safety: don't let admin remove their own Admin role accidentally
             var isSelf = (await UserManager.GetUserIdAsync(user)) == userId;
@@ -223,23 +232,42 @@ else
 
             if (!await UserManager.IsInRoleAsync(user, role))
             {
-                _status = $"User does not have role '{role}'.";
+                m_Status = $"User does not have role '{role}'.";
                 return;
             }
+
+            //Built-in admin can never lose Admin
+            if (role == Roles.Admin && AdminSentinel.IsProtectedAdmin(user.Email, Configuration))
+            {
+                m_Error = $"You cannot remove Admin from the built-in admin account ({AdminSentinel.GetProtectedAdminEmail(Configuration)}).";
+                return;
+            }
+
+            //Never remove the last admin
+            if (role == Roles.Admin)
+            {
+                var admins = await UserManager.GetUsersInRoleAsync(Roles.Admin);
+                if (admins.Count <= 1)
+                {
+                    m_Error = "You must have at least one Admin account.";
+                    return;
+                }
+            }
+
 
             var result = await UserManager.RemoveFromRoleAsync(user, role);
             if (!result.Succeeded)
             {
-                _error = string.Join(" | ", result.Errors.Select(e => e.Description));
+                m_Error = string.Join(" | ", result.Errors.Select(e => e.Description));
                 return;
             }
 
-            _status = $"Removed '{role}' from {(user.Email ?? user.UserName)}.";
+            m_Status = $"Removed '{role}' from {(user.Email ?? user.UserName)}.";
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            m_Error = ex.Message;
         }
     }
 
