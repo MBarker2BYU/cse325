@@ -1,4 +1,5 @@
-﻿namespace ServePoint.Cadet.Auth;
+﻿// ReSharper disable InconsistentNaming
+namespace ServePoint.Cadet.Auth;
 
 public static class Roles
 {
@@ -7,6 +8,8 @@ public static class Roles
     public const string Instructor = "Instructor";
     public const string Admin = "Admin";
 
+    public const string OpportunityCreators = Organizer + "," + Instructor + "," + Admin;
+    
     public static readonly string[] All =
     {
         User,

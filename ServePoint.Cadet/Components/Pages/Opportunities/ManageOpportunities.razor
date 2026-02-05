@@ -1,0 +1,360 @@
+﻿@page "/opportunities/manage"
+@rendermode InteractiveServer
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using ServePoint.Cadet.Models
+@using ServePoint.Cadet.Models.Entities
+@using ServePoint.Cadet.Services
+
+@attribute [Authorize(Roles = $"{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")]
+
+@inject OpportunityService Opportunities
+
+<PageTitle>Manage Opportunities</PageTitle>
+
+<h1>Manage Opportunities</h1>
+
+@if (!string.IsNullOrWhiteSpace(_status))
+{
+    <div class="alert alert-info">@_status</div>
+}
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <b>Create New Opportunity</b>
+    </div>
+    <div class="card-body">
+        <EditForm Model="_create" OnValidSubmit="Create">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Title</label>
+                    <InputText class="form-control" @bind-Value="_create.Title" />
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Date</label>
+                    <InputDate class="form-control" @bind-Value="_create.Date" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Hours</label>
+                    <InputNumber class="form-control" @bind-Value="_create.Hours" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <InputText class="form-control" @bind-Value="_create.Location" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <InputTextArea class="form-control" @bind-Value="_create.Description" />
+                </div>
+            </div>
+
+            <button class="btn btn-primary mt-3" type="submit" disabled="@_busy">
+                @(_busy ? "Saving..." : "Create")
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <input class="form-control" style="max-width: 320px"
+           placeholder="Search title/location..."
+           @bind="_search" @bind:event="oninput" />
+    <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@_busy">Refresh</button>
+</div>
+
+@if (_items is null)
+{
+    <p>Loading…</p>
+}
+else if (_items.Count == 0)
+{
+    <p>No opportunities yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 22%">Title</th>
+                    <th style="width: 14%">Date</th>
+                    <th style="width: 10%">Hours</th>
+                    <th style="width: 18%">Location</th>
+                    <th>Description</th>
+                    <th style="width: 18%">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Filtered)
+                {
+                    <tr>
+                        @if (_editingId == row.Id)
+                        {
+                            <td>
+                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Title" />
+                            </td>
+                            <td>
+                                <InputDate class="form-control form-control-sm" @bind-Value="_edit.Date" />
+                            </td>
+                            <td>
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_edit.Hours" />
+                            </td>
+                            <td>
+                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Location" />
+                            </td>
+                            <td>
+                                <InputText class="form-control form-control-sm" @bind-Value="_edit.Description" />
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-success" @onclick="SaveEdit" disabled="@_busy">Save</button>
+                                <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit" disabled="@_busy">Cancel</button>
+                            </td>
+                        }
+                        else
+                        {
+                            <td>@row.Title</td>
+                            <td>@row.Date.ToShortDateString()</td>
+                            <td>@row.Hours</td>
+                            <td>@row.Location</td>
+                            <td class="text-truncate" style="max-width: 320px">@row.Description</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        @onclick="() => BeginEdit(row)"
+                                        disabled="@_busy">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger ms-1"
+                                        @onclick="() => Delete(row.Id)"
+                                        disabled="@_busy">
+                                    Delete
+                                </button>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private List<VolunteerOpportunity>? _items;
+    private string _search = "";
+    private bool _busy;
+    private string? _status;
+    private string? _error;
+
+    // Create model
+    private CreateModel _create = new();
+
+    // Inline edit state
+    private int? _editingId;
+    private EditModel _edit = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+    private IEnumerable<VolunteerOpportunity> Filtered =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _items!
+            : _items!.Where(o =>
+                (o.Title ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (o.Location ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private async Task Reload()
+    {
+        _status = null;
+        _error = null;
+        _editingId = null;
+
+        _items = await Opportunities.GetAllAsync();
+    }
+
+    private async Task Create()
+    {
+        try
+        {
+            _busy = true;
+            _status = null;
+            _error = null;
+
+            var auth = await (AuthenticationStateTask ?? throw new InvalidOperationException("No auth state."));
+            var userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                _error = "Unable to determine current user.";
+                return;
+            }
+
+            var entity = new VolunteerOpportunity
+            {
+                Title = _create.Title.Trim(),
+                Description = string.IsNullOrWhiteSpace(_create.Description) ? null : _create.Description.Trim(),
+                Date = _create.Date,
+                Location = string.IsNullOrWhiteSpace(_create.Location) ? null : _create.Location.Trim(),
+                Hours = _create.Hours,
+                CreatedByUserId = userId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await Opportunities.CreateAsync(entity);
+            _status = "Opportunity created.";
+            _create = new CreateModel(); // reset
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void BeginEdit(VolunteerOpportunity row)
+    {
+        _status = null;
+        _error = null;
+
+        _editingId = row.Id;
+        _edit = new EditModel
+        {
+            Id = row.Id,
+            Title = row.Title,
+            Description = row.Description,
+            Date = row.Date,
+            Location = row.Location,
+            Hours = row.Hours
+        };
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            _busy = true;
+            _status = null;
+            _error = null;
+
+            if (_editingId is null)
+                return;
+
+            var updated = new VolunteerOpportunity
+            {
+                Id = _edit.Id,
+                Title = _edit.Title.Trim(),
+                Description = string.IsNullOrWhiteSpace(_edit.Description) ? null : _edit.Description.Trim(),
+                Date = _edit.Date,
+                Location = string.IsNullOrWhiteSpace(_edit.Location) ? null : _edit.Location.Trim(),
+                Hours = _edit.Hours
+            };
+
+            var ok = await Opportunities.UpdateAsync(updated);
+            if (!ok)
+            {
+                _error = "Opportunity not found (may have been deleted).";
+                return;
+            }
+
+            _status = "Saved changes.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            _busy = true;
+            _status = null;
+            _error = null;
+
+            var ok = await Opportunities.DeleteAsync(id);
+            if (!ok)
+            {
+                _error = "Opportunity not found (may have been deleted).";
+                return;
+            }
+
+            _status = "Opportunity deleted.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // public class CreateModel
+    // {
+    //     [Required, MaxLength(100)]
+    //     public string Title { get; set; } = "";
+
+    //     [MaxLength(500)]
+    //     public string? Description { get; set; }
+
+    //     [Required]
+    //     public DateTime Date { get; set; } = DateTime.Today;
+
+    //     [Range(1, 24)]
+    //     public int Hours { get; set; } = 2;
+
+    //     [MaxLength(200)]
+    //     public string? Location { get; set; }
+    // }
+
+    // public class EditModel
+    // {
+    //     public int Id { get; set; }
+
+    //     [Required, MaxLength(100)]
+    //     public string Title { get; set; } = "";
+
+    //     [MaxLength(500)]
+    //     public string? Description { get; set; }
+
+    //     [Required]
+    //     public DateTime Date { get; set; } = DateTime.Today;
+
+    //     [Range(1, 24)]
+    //     public int Hours { get; set; }
+
+    //     [MaxLength(200)]
+    //     public string? Location { get; set; }
+    // }
+}

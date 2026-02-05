@@ -1,5 +1,8 @@
 ﻿@implements IDisposable
 @inject NavigationManager NavigationManager
+
+@using ServePoint.Cadet.Auth
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">ServePoint.Cadet</a>
@@ -27,6 +30,28 @@
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
             </NavLink>
         </div>
+        
+        <AuthorizeView Roles="@Roles.OpportunityCreators">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="opportunities/manage">
+                        <span class="bi bi-list-check-nav-menu" aria-hidden="true"></span> Opportunities
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        
+        <AuthorizeView Roles="@Roles.Admin">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/users">
+                        <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> User Management
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
         <AuthorizeView>
             <Authorized>
                 <div class="nav-item px-3">
@@ -37,7 +62,7 @@
                 <div class="nav-item px-3">
                     <form action="Account/Logout" method="post">
                         <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <input type="hidden" name="ReturnUrl" value="@m_CurrentUrl" />
                         <button type="submit" class="nav-link">
                             <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
                         </button>
@@ -61,16 +86,16 @@
 </div>
 
 @code {
-    private string? currentUrl;
+    private string? m_CurrentUrl;
     protected override void OnInitialized()
     {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        m_CurrentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        m_CurrentUrl = NavigationManager.ToBaseRelativePath(e.Location);
         StateHasChanged();
     }
 

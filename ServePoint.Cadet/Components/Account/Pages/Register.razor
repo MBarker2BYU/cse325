@@ -57,7 +57,7 @@
 </div>
 
 @code {
-    private IEnumerable<IdentityError>? identityErrors;
+    private IEnumerable<IdentityError>? m_IdentityErrors;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -65,7 +65,7 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => m_IdentityErrors is null ? null : $"Error: {string.Join(", ", m_IdentityErrors.Select(error => error.Description))}";
 
     protected override void OnInitialized()
     {
@@ -83,7 +83,7 @@
 
         if (!result.Succeeded)
         {
-            identityErrors = result.Errors;
+            m_IdentityErrors = result.Errors;
             return;
         }
 
@@ -91,7 +91,7 @@
         if (!roleResult.Succeeded)
         {
             // Optional: surface role errors so you can see them in the UI
-            identityErrors = identityErrors.Concat(roleResult.Errors);
+            m_IdentityErrors = m_IdentityErrors.Concat(roleResult.Errors);
             return;
         }
 

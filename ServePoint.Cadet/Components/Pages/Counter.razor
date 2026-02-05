@@ -42,7 +42,7 @@ else
     <hr />
 } *@
 
-<p role="status">Current count: @_currentCount</p>
+<p role="status">Current count: @m_CurrentCount</p>
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
@@ -50,14 +50,14 @@ else
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
-    private AuthenticationState? _authState;
-    private int _currentCount = 0;
+    private AuthenticationState? m_AuthState;
+    private int m_CurrentCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
-        _authState = await (AuthenticationStateTask
+        m_AuthState = await (AuthenticationStateTask
                             ?? throw new InvalidOperationException("No AuthenticationState found. Make sure AddCascadingAuthenticationState() is registered."));
     }
 
-    private void IncrementCount() => _currentCount++;
+    private void IncrementCount() => m_CurrentCount++;
 }

@@ -1,0 +1,256 @@
+﻿@page "/admin/users"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using ServePoint.Cadet.Auth
+@using ServePoint.Cadet.Data
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize(Roles = Roles.Admin)]
+
+@inject UserManager<ServePointCadetUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<PageTitle>User Management</PageTitle>
+
+<h1>User Management</h1>
+
+@if (!string.IsNullOrWhiteSpace(_status))
+{
+    <div class="alert alert-info">@_status</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_rows is null)
+{
+    <p>Loading users…</p>
+}
+else if (_rows.Count == 0)
+{
+    <p>No users found.</p>
+}
+else
+{
+    <div class="mb-3">
+        <input class="form-control" placeholder="Search email/username..."
+               @bind="_search" @bind:event="oninput" />
+    </div>
+
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th style="width: 35%">Email / Username</th>
+                <th style="width: 35%">Roles</th>
+                <th style="width: 30%">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in FilteredRows)
+            {
+                <tr>
+                    <td>
+                        <div><b>@(r.Email ?? r.UserName)</b></div>
+                        <div class="text-muted" style="font-size: 0.9em">@r.Id</div>
+                    </td>
+
+                    <td>
+                        @if (r.Roles.Count == 0)
+                        {
+                            <span class="text-muted">None</span>
+                        }
+                        else
+                        {
+                            @foreach (var role in r.Roles.OrderBy(x => x))
+                            {
+                                <span class="badge bg-secondary me-1">@role</span>
+                            }
+                        }
+                    </td>
+
+                    <td>
+                        <div class="d-flex flex-wrap gap-2">
+                            <select class="form-select form-select-sm" style="width: 160px"
+                                    @bind="r.SelectedRoleToAdd">
+                                <option value="">Add role…</option>
+                                @foreach (var role in Roles.All)
+                                {
+                                    <option value="@role">@role</option>
+                                }
+                            </select>
+
+                            <button class="btn btn-sm btn-primary"
+                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToAdd)"
+                                    @onclick="() => AddRole(r.Id, r.SelectedRoleToAdd!)">
+                                Add
+                            </button>
+
+                            <select class="form-select form-select-sm" style="width: 160px"
+                                    @bind="r.SelectedRoleToRemove">
+                                <option value="">Remove role…</option>
+                                @foreach (var role in r.Roles.OrderBy(x => x))
+                                {
+                                    <option value="@role">@role</option>
+                                }
+                            </select>
+
+                            <button class="btn btn-sm btn-outline-danger"
+                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
+                                    @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
+                                Remove
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<UserRow>? _rows;
+    private string _search = "";
+    private string? _status;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private IEnumerable<UserRow> FilteredRows =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _rows!
+            : _rows!.Where(r =>
+                (r.Email ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (r.UserName ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private async Task LoadAsync()
+    {
+        _status = null;
+        _error = null;
+
+        // Ensure roles exist (defensive)
+        foreach (var role in Roles.All)
+        {
+            if (!await RoleManager.RoleExistsAsync(role))
+            {
+                await RoleManager.CreateAsync(new IdentityRole(role));
+            }
+        }
+
+        var users = await UserManager.Users
+            .AsNoTracking()
+            .OrderBy(u => u.Email)
+            .ToListAsync();
+
+        var rows = new List<UserRow>(users.Count);
+        foreach (var u in users)
+        {
+            var roles = await UserManager.GetRolesAsync(u);
+            rows.Add(new UserRow
+            {
+                Id = u.Id,
+                Email = u.Email,
+                UserName = u.UserName,
+                Roles = roles.ToList()
+            });
+        }
+
+        _rows = rows;
+    }
+
+    private async Task AddRole(string userId, string role)
+    {
+        try
+        {
+            _status = null;
+            _error = null;
+
+            var user = await UserManager.FindByIdAsync(userId);
+            if (user is null) { _error = "User not found."; return; }
+
+            if (!await RoleManager.RoleExistsAsync(role))
+            {
+                _error = $"Role '{role}' does not exist.";
+                return;
+            }
+
+            // Prevent removing your own Admin later? (optional; we’ll handle in RemoveRole)
+            if (await UserManager.IsInRoleAsync(user, role))
+            {
+                _status = $"User already has role '{role}'.";
+                return;
+            }
+
+            var result = await UserManager.AddToRoleAsync(user, role);
+            if (!result.Succeeded)
+            {
+                _error = string.Join(" | ", result.Errors.Select(e => e.Description));
+                return;
+            }
+
+            _status = $"Added '{role}' to {(user.Email ?? user.UserName)}.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RemoveRole(string userId, string role)
+    {
+        try
+        {
+            _status = null;
+            _error = null;
+
+            var user = await UserManager.FindByIdAsync(userId);
+            if (user is null) { _error = "User not found."; return; }
+
+            // Safety: don't let admin remove their own Admin role accidentally
+            var isSelf = (await UserManager.GetUserIdAsync(user)) == userId;
+            // ^ This line isn't perfect for "self" without the current principal; simplest guard below:
+            // We'll instead block removing Admin from *any* user if it would leave zero admins later (optional).
+            // For now: block removing Admin from the currently logged-in account would require AuthenticationState.
+            // Keep it simple: block removing Admin from any account if you want safety:
+            // if (role == Roles.Admin) { _error = "Admin role removal disabled here."; return; }
+
+            if (!await UserManager.IsInRoleAsync(user, role))
+            {
+                _status = $"User does not have role '{role}'.";
+                return;
+            }
+
+            var result = await UserManager.RemoveFromRoleAsync(user, role);
+            if (!result.Succeeded)
+            {
+                _error = string.Join(" | ", result.Errors.Select(e => e.Description));
+                return;
+            }
+
+            _status = $"Removed '{role}' from {(user.Email ?? user.UserName)}.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private sealed class UserRow
+    {
+        public string Id { get; set; } = "";
+        public string? Email { get; set; }
+        public string? UserName { get; set; }
+        public List<string> Roles { get; set; } = new();
+
+        public string? SelectedRoleToAdd { get; set; }
+        public string? SelectedRoleToRemove { get; set; }
+    }
+}

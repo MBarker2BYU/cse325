@@ -29,9 +29,7 @@ public class Roles
     {
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-        string[] roles = ["User", "Organizer", "Instructor", "Admin"];
-
-        foreach (var role in roles)
+        foreach (var role in Auth.Roles.All)
         {
             if (!await roleManager.RoleExistsAsync(role))
             {

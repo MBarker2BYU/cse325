@@ -12,17 +12,17 @@
 <PageTitle>Manage your external logins</PageTitle>
 
 <StatusMessage />
-@if (currentLogins?.Count > 0)
+@if (m_CurrentLogins?.Count > 0)
 {
     <h3>Registered Logins</h3>
     <table class="table">
         <tbody>
-            @foreach (var login in currentLogins)
+            @foreach (var login in m_CurrentLogins)
             {
                 <tr>
                     <td>@login.ProviderDisplayName</td>
                     <td>
-                        @if (showRemoveButton)
+                        @if (m_ShowRemoveButton)
                         {
                             <form @formname="@($"remove-login-{login.LoginProvider}")" @onsubmit="OnSubmitAsync" method="post">
                                 <AntiforgeryToken />
@@ -43,7 +43,7 @@
         </tbody>
     </table>
 }
-@if (otherLogins?.Count > 0)
+@if (m_OtherLogins?.Count > 0)
 {
     <h4>Add another service to log in.</h4>
     <hr />
@@ -51,7 +51,7 @@
         <AntiforgeryToken />
         <div>
             <p>
-                @foreach (var provider in otherLogins)
+                @foreach (var provider in m_OtherLogins)
                 {
                     <button type="submit" class="btn btn-primary" name="Provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">
                         @provider.DisplayName
@@ -63,12 +63,12 @@
 }
 
 @code {
-    public const string LinkLoginCallbackAction = "LinkLoginCallback";
+    public const string LINK_LOGIN_CALLBACK_ACTION = "LinkLoginCallback";
 
-    private ServePointCadetUser? user;
-    private IList<UserLoginInfo>? currentLogins;
-    private IList<AuthenticationScheme>? otherLogins;
-    private bool showRemoveButton;
+    private ServePointCadetUser? m_User;
+    private IList<UserLoginInfo>? m_CurrentLogins;
+    private IList<AuthenticationScheme>? m_OtherLogins;
+    private bool m_ShowRemoveButton;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -84,27 +84,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-        user = await UserManager.GetUserAsync(HttpContext.User);
-        if (user is null)
+        m_User = await UserManager.GetUserAsync(HttpContext.User);
+        if (m_User is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
 
-        currentLogins = await UserManager.GetLoginsAsync(user);
-        otherLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync())
-            .Where(auth => currentLogins.All(ul => auth.Name != ul.LoginProvider))
+        m_CurrentLogins = await UserManager.GetLoginsAsync(m_User);
+        m_OtherLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync())
+            .Where(auth => m_CurrentLogins.All(ul => auth.Name != ul.LoginProvider))
             .ToList();
 
         string? passwordHash = null;
         if (UserStore is IUserPasswordStore<ServePointCadetUser> userPasswordStore)
         {
-            passwordHash = await userPasswordStore.GetPasswordHashAsync(user, HttpContext.RequestAborted);
+            passwordHash = await userPasswordStore.GetPasswordHashAsync(m_User, HttpContext.RequestAborted);
         }
 
-        showRemoveButton = passwordHash is not null || currentLogins.Count > 1;
+        m_ShowRemoveButton = passwordHash is not null || m_CurrentLogins.Count > 1;
 
-        if (HttpMethods.IsGet(HttpContext.Request.Method) && Action == LinkLoginCallbackAction)
+        if (HttpMethods.IsGet(HttpContext.Request.Method) && Action == LINK_LOGIN_CALLBACK_ACTION)
         {
             await OnGetLinkLoginCallbackAsync();
         }
@@ -112,33 +112,33 @@
 
     private async Task OnSubmitAsync()
     {
-        if (user is null)
+        if (m_User is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
 
-        var result = await UserManager.RemoveLoginAsync(user, LoginProvider!, ProviderKey!);
+        var result = await UserManager.RemoveLoginAsync(m_User, LoginProvider!, ProviderKey!);
         if (!result.Succeeded)
         {
             RedirectManager.RedirectToCurrentPageWithStatus("Error: The external login was not removed.", HttpContext);
         }
         else
         {
-            await SignInManager.RefreshSignInAsync(user);
+            await SignInManager.RefreshSignInAsync(m_User);
             RedirectManager.RedirectToCurrentPageWithStatus("The external login was removed.", HttpContext);
         }
     }
 
     private async Task OnGetLinkLoginCallbackAsync()
     {
-        if (user is null)
+        if (m_User is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
 
-        var userId = await UserManager.GetUserIdAsync(user);
+        var userId = await UserManager.GetUserIdAsync(m_User);
         var info = await SignInManager.GetExternalLoginInfoAsync(userId);
         if (info is null)
         {
@@ -146,7 +146,7 @@
             return;
         }
 
-        var result = await UserManager.AddLoginAsync(user, info);
+        var result = await UserManager.AddLoginAsync(m_User, info);
         if (result.Succeeded)
         {
             // Clear the existing external cookie to ensure a clean login process

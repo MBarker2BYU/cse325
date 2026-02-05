@@ -1,10 +1,11 @@
-﻿using ServePoint.Cadet.Components;
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ServePoint.Cadet.Components;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Seed;
+using ServePoint.Cadet.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("ServePointCadetContext") ?? throw new InvalidOperationException("Connection string 'ServePointCadetContext' not found.");;
@@ -41,6 +42,8 @@ builder.Services.AddIdentityCore<ServePointCadetUser>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ServePointCadetUser>, IdentityNoOpEmailSender>();
 
+builder.Services.AddScoped<OpportunityService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -67,7 +70,7 @@ app.MapAdditionalIdentityEndpoints();;
 using (var scope = app.Services.CreateScope())
 {
     await Roles.SeedAsync(scope.ServiceProvider);
+    await Admin.SeedAsync(scope.ServiceProvider);
 }
-
 
 app.Run();
