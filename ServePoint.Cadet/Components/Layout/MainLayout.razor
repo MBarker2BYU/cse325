@@ -1,16 +1,26 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<div class="sp-shell">
+    <aside class="sp-sidebar">
+        <div class="sp-brand">
+            <span class="sp-brand-mark">◆</span>
+            <span class="sp-brand-text">ServePoint<span class="sp-brand-sub">.Cadet</span></span>
         </div>
 
-        <article class="content px-4">
+        <div class="sp-navwrap">
+            <NavMenu />
+        </div>
+
+        <div class="sp-sidebar-footer">
+            <a class="sp-nav-link sp-nav-link-footer" href="about">
+                <span class="bi bi-info-circle" aria-hidden="true"></span>
+                About
+            </a>
+        </div>
+    </aside>
+
+    <main class="sp-main">
+        <article class="sp-content">
             @Body
         </article>
     </main>

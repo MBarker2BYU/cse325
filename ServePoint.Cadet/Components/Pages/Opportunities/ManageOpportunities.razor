@@ -233,7 +233,7 @@ else
 @* ===== Shared Backdrop ===== *@
 @if (m_ShowDetails || m_ShowEditor)
 {
-    <div class="offcanvas-backdrop fade show" @onclick="ClosePanelsAsync"></div>
+    <div class="offcanvas-backdrop fade show sp-backdrop" @onclick="ClosePanelsAsync"></div>
 }
 
 @* ===== DETAILS PANEL ===== *@
@@ -241,17 +241,17 @@ else
 {
     var organizerLocked = m_Selected.IsApproved && !m_CanEditAfterApproval;
 
-    <div class="offcanvas offcanvas-end show shadow"
+    <div class="offcanvas offcanvas-end show shadow sp-offcanvas"
          tabindex="-1"
          style="visibility: visible; width: min(560px, 92vw); z-index: 1045;"
          aria-modal="true"
          role="dialog"
          @onclick:stopPropagation="true">
 
-        <div class="offcanvas-header border-bottom">
+        <div class="offcanvas-header">
             <div>
                 <h5 class="offcanvas-title mb-0">Opportunity Details</h5>
-                <div class="text-muted small">
+                <div class="small text-muted">
                     @m_Selected.Title
                     @if (m_Selected.IsApproved)
                     {
@@ -329,9 +329,7 @@ else
                 }
             </div>
 
-            <hr />
-
-            <div class="d-flex gap-2 flex-wrap">
+            <div class="sp-panel-actions d-flex gap-2 flex-wrap">
                 @if (m_CanApprove)
                 {
                     @if (!m_Selected.IsApproved)
@@ -384,19 +382,19 @@ else
 @* ===== EDITOR PANEL ===== *@
 @if (m_ShowEditor)
 {
-    <div class="offcanvas offcanvas-end show shadow"
+    <div class="offcanvas offcanvas-end show shadow sp-offcanvas"
          tabindex="-1"
          style="visibility: visible; width: min(560px, 92vw); z-index: 1045;"
          aria-modal="true"
          role="dialog"
          @onclick:stopPropagation="true">
 
-        <div class="offcanvas-header border-bottom">
+        <div class="offcanvas-header">
             <div>
                 <h5 class="offcanvas-title mb-0">Edit Opportunity</h5>
                 @if (m_EditingRow is not null)
                 {
-                    <div class="text-muted small">
+                    <div class="small text-muted">
                         @m_EditingRow.Title
                         @if (m_EditingRow.IsApproved)
                         {
@@ -495,7 +493,7 @@ else
                     </div>
                 </div>
 
-                <div class="d-flex gap-2 mt-4">
+                <div class="sp-panel-actions d-flex gap-2 mt-4">
                     <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
                         @(m_Busy ? "Saving..." : "Save")
                     </button>
@@ -679,7 +677,7 @@ else
         };
 
         m_ShowEditor = true;
-        m_ShowDetails = false; // editor replaces details
+        m_ShowDetails = false;
         m_Selected = null;
 
         await RegisterEscAsync();
@@ -797,12 +795,6 @@ else
         }
     }
 
-    private async Task DeleteFromPanelAsync(int id)
-    {
-        await DeleteAsync(id);
-        await ClosePanelsAsync();
-    }
-
     private async Task ApproveAsync(int id)
     {
         try
@@ -871,9 +863,7 @@ else
 
     private async Task RefreshSelectedFromListAsync()
     {
-        // If panels are closed, nothing to sync.
         if (!m_ShowDetails || m_Selected is null) return;
-
         if (m_Items is null) return;
 
         var latest = m_Items.FirstOrDefault(o => o.Id == m_Selected.Id);
@@ -887,15 +877,11 @@ else
     }
 
     [JSInvokable]
-    public async Task OnEscPressed()
-    {
-        await ClosePanelsAsync();
-    }
+    public async Task OnEscPressed() => await ClosePanelsAsync();
 
     private async Task RegisterEscAsync()
     {
-        if (m_EscListener is not null)
-            return;
+        if (m_EscListener is not null) return;
 
         m_SelfRef = DotNetObjectReference.Create(this);
 
@@ -919,27 +905,18 @@ else
     }
 
     private async Task<bool> ConfirmDeleteAsync(string title)
-    {
-        // Simple + reliable (uses browser confirm)
-        return await JS.InvokeAsync<bool>("confirm", $"Delete '{title}'? This cannot be undone.");
-    }
+        => await JS.InvokeAsync<bool>("confirm", $"Delete '{title}'? This cannot be undone.");
 
     private async Task ConfirmAndDeleteAsync(VolunteerOpportunity row)
     {
-        if (!await ConfirmDeleteAsync(row.Title))
-            return;
-
+        if (!await ConfirmDeleteAsync(row.Title)) return;
         await DeleteAsync(row.Id);
     }
 
     private async Task ConfirmAndDeleteFromPanelAsync(VolunteerOpportunity row)
     {
-        if (!await ConfirmDeleteAsync(row.Title))
-            return;
-
+        if (!await ConfirmDeleteAsync(row.Title)) return;
         await DeleteAsync(row.Id);
         await ClosePanelsAsync();
     }
-
-
 }

@@ -3,9 +3,9 @@
 
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data
-@using Microsoft.EntityFrameworkCore
 
 @attribute [Authorize(Roles = Roles.Admin)]
 
@@ -42,94 +42,97 @@ else
                @bind="m_Search" @bind:event="oninput" />
     </div>
 
-    <table class="table table-sm align-middle">
-        <thead>
-            <tr>
-                <th style="width: 35%">Email / Username</th>
-                <th style="width: 35%">Roles</th>
-                <th style="width: 30%">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var r in FilteredRows)
-            {
-                <tr>
-                    <td>
-                        <div class="d-flex align-items-center gap-2">
-                            <b>@(r.Email ?? r.UserName)</b>
+    <div class="card sp-card sp-table-shell shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 35%"><span class="sp-label">Email / Username</span></th>
+                        <th style="width: 35%"><span class="sp-label">Roles</span></th>
+                        <th style="width: 30%"><span class="sp-label">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in FilteredRows)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <b>@(r.Email ?? r.UserName)</b>
 
-                            @if (AdminSentinel.IsProtectedAdmin(r.Email, Configuration))
-                            {
-                                <span class="badge bg-warning text-dark"
-                                      title="This is the built-in admin account and cannot be demoted from Admin.">
-                                    Protected
-                                </span>
-                            }
-                        </div>
-
-                        <div class="text-muted" style="font-size: 0.9em">@r.Id</div>
-                    </td>
-
-
-                    <td>
-                        @if (r.Roles.Count == 0)
-                        {
-                            <span class="text-muted">None</span>
-                        }
-                        else
-                        {
-                            @foreach (var role in r.Roles.OrderBy(x => x))
-                            {
-                                <span class="badge bg-secondary me-1">@role</span>
-                            }
-                        }
-                    </td>
-
-                    <td>
-                        <div class="d-flex flex-wrap gap-2">
-                            <select class="form-select form-select-sm" style="width: 160px"
-                                    @bind="r.SelectedRoleToAdd">
-                                <option value="">Add role…</option>
-                                @foreach (var role in Roles.All)
-                                {
-                                    <option value="@role">@role</option>
-                                }
-                            </select>
-
-                            <button class="btn btn-sm btn-primary"
-                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToAdd)"
-                                    @onclick="() => AddRole(r.Id, r.SelectedRoleToAdd!)">
-                                Add
-                            </button>
-
-                            <select class="form-select form-select-sm" style="width: 160px"
-                                    @bind="r.SelectedRoleToRemove">
-                                <option value="">Remove role…</option>
-
-                                @foreach (var role in r.Roles.OrderBy(x => x))
-                                {
-                                    // Hide Admin removal option for the protected admin account
-                                    if (role == Roles.Admin && (r.Email ?? "").Equals(AdminSentinel.GetProtectedAdminEmail(Configuration), StringComparison.OrdinalIgnoreCase))
+                                    @if (AdminSentinel.IsProtectedAdmin(r.Email, Configuration))
                                     {
-                                        continue;
+                                        <span class="badge bg-warning text-dark"
+                                              title="This is the built-in admin account and cannot be demoted from Admin.">
+                                            Protected
+                                        </span>
                                     }
+                                </div>
 
-                                    <option value="@role">@role</option>
+                                <div class="text-muted" style="font-size: 0.9em">@r.Id</div>
+                            </td>
+
+                            <td>
+                                @if (r.Roles.Count == 0)
+                                {
+                                    <span class="text-muted">None</span>
                                 }
-                            </select>
+                                else
+                                {
+                                    @foreach (var role in r.Roles.OrderBy(x => x))
+                                    {
+                                        <span class="badge bg-secondary me-1">@role</span>
+                                    }
+                                }
+                            </td>
 
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <select class="form-select form-select-sm" style="width: 160px"
+                                            @bind="r.SelectedRoleToAdd">
+                                        <option value="">Add role…</option>
+                                        @foreach (var role in Roles.All)
+                                        {
+                                            <option value="@role">@role</option>
+                                        }
+                                    </select>
 
-                            <button class="btn btn-sm btn-outline-danger"
-                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
-                                    @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
-                                Remove
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+                                    <button class="btn btn-sm btn-primary"
+                                            disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToAdd)"
+                                            @onclick="() => AddRole(r.Id, r.SelectedRoleToAdd!)">
+                                        Add
+                                    </button>
+
+                                    <select class="form-select form-select-sm" style="width: 160px"
+                                            @bind="r.SelectedRoleToRemove">
+                                        <option value="">Remove role…</option>
+
+                                        @foreach (var role in r.Roles.OrderBy(x => x))
+                                        {
+                                            // Hide Admin removal option for the protected admin account
+                                            if (role == Roles.Admin &&
+                                            (r.Email ?? "").Equals(AdminSentinel.GetProtectedAdminEmail(Configuration), StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                continue;
+                                            }
+
+                                            <option value="@role">@role</option>
+                                        }
+                                    </select>
+
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
+                                            @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
+                                        Remove
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }
 
 @code {
@@ -201,7 +204,6 @@ else
                 return;
             }
 
-            // Prevent removing your own Admin later? (optional; we’ll handle in RemoveRole)
             if (await UserManager.IsInRoleAsync(user, role))
             {
                 m_Status = $"User already has role '{role}'.";
@@ -234,28 +236,20 @@ else
             var user = await UserManager.FindByIdAsync(userId);
             if (user is null) { m_Error = "User not found."; return; }
 
-            // Safety: don't let admin remove their own Admin role accidentally
-            var isSelf = (await UserManager.GetUserIdAsync(user)) == userId;
-            // ^ This line isn't perfect for "self" without the current principal; simplest guard below:
-            // We'll instead block removing Admin from *any* user if it would leave zero admins later (optional).
-            // For now: block removing Admin from the currently logged-in account would require AuthenticationState.
-            // Keep it simple: block removing Admin from any account if you want safety:
-            // if (role == Roles.Admin) { _error = "Admin role removal disabled here."; return; }
-
             if (!await UserManager.IsInRoleAsync(user, role))
             {
                 m_Status = $"User does not have role '{role}'.";
                 return;
             }
 
-            //Built-in admin can never lose Admin
+            // Built-in admin can never lose Admin
             if (role == Roles.Admin && AdminSentinel.IsProtectedAdmin(user.Email, Configuration))
             {
                 m_Error = $"You cannot remove Admin from the built-in admin account ({AdminSentinel.GetProtectedAdminEmail(Configuration)}).";
                 return;
             }
 
-            //Never remove the last admin
+            // Never remove the last admin
             if (role == Roles.Admin)
             {
                 var admins = await UserManager.GetUsersInRoleAsync(Roles.Admin);
@@ -265,7 +259,6 @@ else
                     return;
                 }
             }
-
 
             var result = await UserManager.RemoveFromRoleAsync(user, role);
             if (!result.Succeeded)

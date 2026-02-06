@@ -68,4 +68,32 @@ public sealed class DashboardService(ServePointCadetContext db)
         return (true, null);
     }
 
+    public async Task<(bool ok, string? error)> MarkCompletedAsync(
+        string userId,
+        int signupId,
+        CancellationToken ct = default)
+    {
+        var signup = await db.VolunteerSignups
+            .Include(s => s.VolunteerOpportunity)
+            .FirstOrDefaultAsync(s => s.Id == signupId && s.UserId == userId, ct);
+
+        if (signup is null)
+            return (false, "Signup not found.");
+
+        // Rule: after event date is past it becomes read-only for withdraw,
+        // but completion is usually allowed on/after the date.
+        if (signup.VolunteerOpportunity.Date.Date > DateTime.Today)
+            return (false, "You can't mark this completed before the event date.");
+
+        if (signup.IsCompleted)
+            return (false, "This signup is already marked completed.");
+
+        signup.IsCompleted = true;
+        signup.CompletedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+
 }
