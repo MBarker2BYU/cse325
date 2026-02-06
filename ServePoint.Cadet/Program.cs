@@ -42,6 +42,7 @@ builder.Services.AddIdentityCore<ServePointCadetUser>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ServePointCadetUser>, IdentityNoOpEmailSender>();
 
+builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<OpportunityService>();
 
 var app = builder.Build();

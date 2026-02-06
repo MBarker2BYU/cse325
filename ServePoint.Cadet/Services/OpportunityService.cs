@@ -121,4 +121,70 @@ public class OpportunityService(ServePointCadetContext database)
         return (true, null);
     }
 
+    public async Task<List<VolunteerOpportunity>> GetApprovedAvailableForUserAsync(
+        string userId,
+        CancellationToken ct = default)
+    {
+        return await database.VolunteerOpportunities
+            .AsNoTracking()
+            .Include(o => o.Contact)
+            .ThenInclude(c => c.Address)
+            .Where(o => o.IsApproved)
+            .Where(o => !database.VolunteerSignups.Any(s =>
+                s.UserId == userId && s.VolunteerOpportunityId == o.Id))
+            .OrderBy(o => o.Date)
+            .ToListAsync(ct);
+    }
+
+
+    public async Task<(bool ok, string? error)> SignupAsync(int opportunityId, string userId, CancellationToken ct = default)
+    {
+        // Must exist and be approved
+        var opp = await database.VolunteerOpportunities
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
+
+        if (opp is null) return (false, "Opportunity not found.");
+        if (!opp.IsApproved) return (false, "This opportunity is not approved yet.");
+
+        // Prevent duplicate signup
+        var exists = await database.VolunteerSignups
+            .AnyAsync(s => s.VolunteerOpportunityId == opportunityId && s.UserId == userId, ct);
+
+        if (exists) return (false, "You are already signed up for this opportunity.");
+
+        // Create signup
+        database.VolunteerSignups.Add(new VolunteerSignup
+        {
+            VolunteerOpportunityId = opportunityId,
+            UserId = userId,
+            SignedUpAt = DateTime.UtcNow
+        });
+
+        await database.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    public async Task<(bool ok, string? error)> WithdrawAsync(int signupId, string userId, CancellationToken ct = default)
+    {
+        var signup = await database.VolunteerSignups
+            .Include(s => s.VolunteerOpportunity)
+            .FirstOrDefaultAsync(s => s.Id == signupId && s.UserId == userId, ct);
+
+        if (signup is null) return (false, "Signup not found.");
+
+        // Read-only after event date
+        if (signup.VolunteerOpportunity.Date.Date < DateTime.Today)
+            return (false, "This event has already passed. You can no longer withdraw.");
+
+        // Optional: block withdrawing if they've already marked completed
+        if (signup.IsCompleted)
+            return (false, "This signup is marked completed and cannot be withdrawn.");
+
+        database.VolunteerSignups.Remove(signup);
+        await database.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+
 }
