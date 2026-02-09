@@ -1,7 +1,8 @@
 ﻿@inherits LayoutComponentBase
 
 <div class="sp-shell">
-    <aside class="sp-sidebar">
+    <!-- DESKTOP SIDEBAR (hidden on mobile via CSS) -->
+    <aside class="sp-sidebar sp-sidebar-desktop">
         <div class="sp-brand">
             <span class="sp-brand-mark">◆</span>
             <span class="sp-brand-text">ServePoint<span class="sp-brand-sub">.Cadet</span></span>
@@ -20,10 +21,57 @@
     </aside>
 
     <main class="sp-main">
+        <!-- MOBILE TOPBAR (shown on mobile via CSS) -->
+        <div class="sp-mobile-topbar">
+            <button type="button"
+                    class="sp-mobile-toggle"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#spMobileNav"
+                    aria-controls="spMobileNav"
+                    aria-label="Open menu">
+                <span class="bi bi-list" aria-hidden="true"></span>
+            </button>
+
+            <div class="sp-mobile-title">SERVEPOINT.CADET</div>
+        </div>
+
         <article class="sp-content">
             @Body
         </article>
     </main>
+</div>
+
+<!-- BOOTSTRAP OFFCANVAS (mobile menu) -->
+<div class="offcanvas offcanvas-start sp-offcanvas"
+     tabindex="-1"
+     id="spMobileNav"
+     aria-labelledby="spMobileNavLabel">
+
+    <div class="offcanvas-header sp-offcanvas-header">
+        <div class="sp-brand" id="spMobileNavLabel" style="margin:0;">
+            <span class="sp-brand-mark">◆</span>
+            <span class="sp-brand-text">ServePoint<span class="sp-brand-sub">.Cadet</span></span>
+        </div>
+
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="offcanvas"
+                aria-label="Close">
+        </button>
+    </div>
+
+    <div class="offcanvas-body sp-offcanvas-body">
+        <NavMenu Mobile="true" />
+
+        <div class="sp-nav-sep my-3"></div>
+
+        <a class="sp-nav-link sp-nav-link-footer"
+           href="about"
+           data-bs-dismiss="offcanvas">
+            <span class="bi bi-info-circle" aria-hidden="true"></span>
+            About
+        </a>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>

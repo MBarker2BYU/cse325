@@ -6,7 +6,10 @@
     <AuthorizeView Context="authCtx">
         <Authorized>
             <div class="nav-item px-3">
-                <NavLink class="nav-link sp-nav-link" href="dashboard" Match="NavLinkMatch.All">
+                <NavLink class="nav-link sp-nav-link"
+                         href="dashboard"
+                         Match="NavLinkMatch.All"
+                         @attributes="MobileDismissAttrs">
                     <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span>
                     Dashboard
                 </NavLink>
@@ -15,7 +18,9 @@
             <AuthorizeView Roles="@Roles.OpportunityCreators" Context="creatorsCtx">
                 <Authorized>
                     <div class="nav-item px-3">
-                        <NavLink class="nav-link sp-nav-link" href="opportunities/manage">
+                        <NavLink class="nav-link sp-nav-link"
+                                 href="opportunities/manage"
+                                 @attributes="MobileDismissAttrs">
                             <span class="bi bi-list-check-nav-menu" aria-hidden="true"></span>
                             Opportunities
                         </NavLink>
@@ -26,7 +31,9 @@
             <AuthorizeView Roles="@Roles.Admin" Context="adminCtx">
                 <Authorized>
                     <div class="nav-item px-3">
-                        <NavLink class="nav-link sp-nav-link" href="admin/users">
+                        <NavLink class="nav-link sp-nav-link"
+                                 href="admin/users"
+                                 @attributes="MobileDismissAttrs">
                             <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span>
                             User Management
                         </NavLink>
@@ -37,7 +44,9 @@
             <div class="sp-nav-sep my-2"></div>
 
             <div class="nav-item px-3">
-                <NavLink class="nav-link sp-nav-link" href="Account/Manage">
+                <NavLink class="nav-link sp-nav-link"
+                         href="Account/Manage"
+                         @attributes="MobileDismissAttrs">
                     <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span>
                     @authCtx.User.Identity?.Name
                 </NavLink>
@@ -47,7 +56,9 @@
                 <form action="Account/Logout" method="post" class="m-0">
                     <AntiforgeryToken />
                     <input type="hidden" name="ReturnUrl" value="@m_CurrentUrl" />
-                    <button type="submit" class="nav-link sp-nav-link sp-nav-link-button">
+                    <button type="submit"
+                            class="nav-link sp-nav-link sp-nav-link-button"
+                            @attributes="MobileDismissAttrs">
                         <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
                         Logout
                     </button>
@@ -57,14 +68,18 @@
 
         <NotAuthorized>
             <div class="nav-item px-3">
-                <NavLink class="nav-link sp-nav-link" href="Account/Login">
+                <NavLink class="nav-link sp-nav-link"
+                         href="Account/Login"
+                         @attributes="MobileDismissAttrs">
                     <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span>
                     Login
                 </NavLink>
             </div>
 
             <div class="nav-item px-3">
-                <NavLink class="nav-link sp-nav-link" href="Account/Register">
+                <NavLink class="nav-link sp-nav-link"
+                         href="Account/Register"
+                         @attributes="MobileDismissAttrs">
                     <span class="bi bi-person-plus" aria-hidden="true"></span>
                     Register
                 </NavLink>
@@ -75,7 +90,13 @@
 </nav>
 
 @code {
+    [Parameter] public bool Mobile { get; set; }
+
     private string? m_CurrentUrl;
+
+    // When this nav is rendered inside the bootstrap offcanvas, dismiss it on click.
+    private IReadOnlyDictionary<string, object>? MobileDismissAttrs =>
+        Mobile ? new Dictionary<string, object> { ["data-bs-dismiss"] = "offcanvas" } : null;
 
     protected override void OnInitialized()
     {

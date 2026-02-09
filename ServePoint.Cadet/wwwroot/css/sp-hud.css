@@ -628,3 +628,75 @@ h1, h2, h3, .hud-title {
     margin-left: .75rem;
     margin-right: .75rem;
 }
+
+/* ===== Mobile topbar + offcanvas nav ===== */
+.sp-mobile-topbar {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sp-sidebar-desktop {
+        display: none;
+    }
+
+    .sp-mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        padding: 10px 12px;
+        background: rgba(10,18,18,.85);
+        border-bottom: 1px solid rgba(146,255,238,.14);
+        backdrop-filter: blur(6px);
+    }
+
+    .sp-mobile-title {
+        letter-spacing: .12em;
+        font-weight: 700;
+        font-size: 12px;
+        color: rgba(170,255,245,.9);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sp-mobile-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid rgba(146,255,238,.18);
+        background: rgba(18,28,28,.6);
+        color: rgba(170,255,245,.9);
+    }
+
+        .sp-mobile-toggle .bi {
+            font-size: 20px;
+            line-height: 1;
+        }
+}
+
+/* Make bootstrap offcanvas match HUD look */
+.sp-offcanvas {
+    background: rgba(8,14,14,.98);
+    color: rgba(230,255,250,.9);
+    border-right: 1px solid rgba(146,255,238,.14);
+}
+
+.sp-offcanvas-header {
+    border-bottom: 1px solid rgba(146,255,238,.14);
+}
+
+.sp-offcanvas-body {
+    padding: 12px 0;
+}
+
+/* Make the bootstrap close button not look like plain white on dark */
+.sp-offcanvas .btn-close {
+    filter: invert(1) grayscale(1);
+    opacity: .75;
+}
