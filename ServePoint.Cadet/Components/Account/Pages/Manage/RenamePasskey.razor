@@ -10,7 +10,7 @@
 
 <EditForm Model="Input" OnValidSubmit="Rename" FormName="rename-passkey" method="post">
     <DataAnnotationsValidator />
-    @if (passkey?.Name is { } name)
+    @if (m_Passkey?.Name is { } name)
     {
         <h4>Enter a new name for your "@name" passkey</h4>
     }
@@ -31,8 +31,8 @@
 </EditForm>
 
 @code {
-    private ApplicationUser? user;
-    private UserPasskeyInfo? passkey;
+    private ApplicationUser? m_User;
+    private UserPasskeyInfo? m_Passkey;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -47,8 +47,8 @@
     {
         Input ??= new();
 
-        user = (await UserManager.GetUserAsync(HttpContext.User))!;
-        if (user is null)
+        m_User = (await UserManager.GetUserAsync(HttpContext.User))!;
+        if (m_User is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
@@ -65,8 +65,8 @@
             return;
         }
 
-        passkey = await UserManager.GetPasskeyAsync(user, credentialId);
-        if (passkey is null)
+        m_Passkey = await UserManager.GetPasskeyAsync(m_User, credentialId);
+        if (m_Passkey is null)
         {
             RedirectManager.RedirectToWithStatus("Account/Manage/Passkeys", "Error: The specified passkey could not be found.", HttpContext);
             return;
@@ -75,8 +75,8 @@
 
     private async Task Rename()
     {
-        passkey!.Name = Input.Name;
-        var result = await UserManager.AddOrUpdatePasskeyAsync(user!, passkey);
+        m_Passkey!.Name = Input.Name;
+        var result = await UserManager.AddOrUpdatePasskeyAsync(m_User!, m_Passkey);
         if (!result.Succeeded)
         {
             RedirectManager.RedirectToWithStatus("Account/Manage/Passkeys", "Error: The passkey could not be updated.", HttpContext);

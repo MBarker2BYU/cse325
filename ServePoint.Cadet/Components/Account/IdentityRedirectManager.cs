@@ -6,9 +6,9 @@ namespace ServePoint.Cadet.Components.Account;
 
 internal sealed class IdentityRedirectManager(NavigationManager navigationManager)
 {
-    public const string StatusCookieName = "Identity.StatusMessage";
+    public const string STATUS_COOKIE_NAME = "Identity.StatusMessage";
 
-    private static readonly CookieBuilder StatusCookieBuilder = new()
+    private static readonly CookieBuilder m_StatusCookieBuilder = new()
     {
         SameSite = SameSiteMode.Strict,
         HttpOnly = true,
@@ -38,7 +38,7 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
 
     public void RedirectToWithStatus(string uri, string message, HttpContext context)
     {
-        context.Response.Cookies.Append(StatusCookieName, message, StatusCookieBuilder.Build(context));
+        context.Response.Cookies.Append(STATUS_COOKIE_NAME, message, m_StatusCookieBuilder.Build(context));
         RedirectTo(uri);
     }
 

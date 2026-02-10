@@ -1,0 +1,540 @@
+﻿@page "/opportunities/management"
+@rendermode InteractiveServer
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using ServePoint.Cadet.Auth
+@using ServePoint.Cadet.Data.Services
+
+@attribute [Authorize(Roles = $"{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")]
+
+@inject OpportunityManagementService Opps
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Opportunities Management</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Manage Opportunities</h1>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ToggleCreate" disabled="@(m_Busy)">
+            @(m_ShowCreate ? "Hide Create" : "Create New")
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@(m_Busy)">
+            Refresh
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(m_Status))
+{
+    <div class="alert alert-info">@m_Status</div>
+}
+@if (!string.IsNullOrWhiteSpace(m_Error))
+{
+    <div class="alert alert-danger">@m_Error</div>
+}
+
+@if (m_ShowCreate)
+{
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header">
+            <b>Create New Opportunity</b>
+        </div>
+        <div class="card-body">
+            <EditForm Model="m_Create" OnValidSubmit="CreateAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <label class="form-label">Title</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Title" />
+                    </div>
+
+                    <div class="col-lg-3">
+                        <label class="form-label">Date</label>
+                        <InputDate class="form-control" @bind-Value="m_Create.Date" />
+                    </div>
+
+                    <div class="col-lg-2">
+                        <label class="form-label">Hours</label>
+                        <InputNumber class="form-control" @bind-Value="m_Create.Hours" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="m_Create.Description" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Name</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactName" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Email</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactEmail" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Contact Phone</label>
+                        <InputText class="form-control" @bind-Value="m_Create.ContactPhone" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">Street 1</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Street1" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">Street 2</label>
+                        <InputText class="form-control" @bind-Value="m_Create.Street2" />
+                    </div>
+
+                    <div class="col-lg-6">
+                        <label class="form-label">City</label>
+                        <InputText class="form-control" @bind-Value="m_Create.City" />
+                    </div>
+
+                    <div class="col-lg-2">
+                        <label class="form-label">State</label>
+                        <InputText class="form-control" @bind-Value="m_Create.State" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label">Postal Code</label>
+                        <InputText class="form-control" @bind-Value="m_Create.PostalCode" />
+                    </div>
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                        @(m_Busy ? "Saving..." : "Create")
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearCreate" disabled="@(m_Busy)">
+                        Clear
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <input class="form-control" style="max-width: 360px"
+           placeholder="Search title/contact/city..."
+           @bind="m_Search" @bind:event="oninput" />
+</div>
+
+@if (m_Items is null)
+{
+    <p>Loading…</p>
+}
+else if (m_Items.Count == 0)
+{
+    <p>No opportunities yet.</p>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 28%">Title</th>
+                        <th style="width: 12%">Date</th>
+                        <th style="width: 8%">Hours</th>
+                        <th style="width: 10%">Status</th>
+                        <th style="width: 22%">Contact</th>
+                        <th style="width: 12%">City</th>
+                        <th class="text-end" style="width: 8%">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var row in Filtered)
+                    {
+                        var organizerLocked = IsOrganizerLocked(row);
+
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@row.Title</div>
+                            </td>
+
+                            <td>@row.Date.ToShortDateString()</td>
+                            <td>@row.Hours</td>
+
+                            <td>
+                                @if (row.IsApproved)
+                                {
+                                    <span class="badge bg-success">Approved</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                }
+                            </td>
+
+                            <td>
+                                <div class="fw-semibold">@row.ContactName</div>
+                                <div class="text-muted small">
+                                    @row.ContactEmail
+                                    @if (!string.IsNullOrWhiteSpace(row.ContactEmail) && !string.IsNullOrWhiteSpace(row.ContactPhone))
+                                    {
+                                        <span> • </span>
+                                    }
+                                    @row.ContactPhone
+                                </div>
+                            </td>
+
+                            <td class="text-muted">@row.City</td>
+
+                            <td class="text-end text-nowrap">
+                                @if (m_Actor is not null && m_Actor.CanApprove)
+                                {
+                                    if (!row.IsApproved)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success"
+                                                disabled="@(m_Busy)"
+                                                @onclick="() => ApproveAsync(row.Id)">
+                                            Approve
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning"
+                                                disabled="@(m_Busy)"
+                                                @onclick="() => UnapproveAsync(row.Id)">
+                                            Unapprove
+                                        </button>
+                                    }
+                                }
+
+                                <button class="btn btn-sm btn-outline-primary ms-1"
+                                        disabled="@(m_Busy || organizerLocked)"
+                                        title="@(organizerLocked ? "Organizers cannot edit after the opportunity date." : null)"
+                                        @onclick="() => OpenEditor(row)">
+                                    Edit
+                                </button>
+
+                                <button class="btn btn-sm btn-outline-danger ms-1"
+                                        disabled="@(m_Busy || organizerLocked)"
+                                        title="@(organizerLocked ? "Organizers cannot delete after the opportunity date." : null)"
+                                        @onclick="() => DeleteAsync(row.Id)">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+}
+
+@if (m_ShowEditor && m_Edit is not null)
+{
+    <div class="offcanvas-backdrop fade show sp-backdrop" @onclick="CloseEditor"></div>
+
+    <div class="offcanvas offcanvas-end show shadow sp-offcanvas"
+         tabindex="-1"
+         style="visibility: visible; width: min(560px, 92vw); z-index: 1045;"
+         aria-modal="true"
+         role="dialog"
+         @onclick:stopPropagation="true">
+
+        <div class="offcanvas-header">
+            <div>
+                <h5 class="offcanvas-title mb-0">Edit Opportunity</h5>
+                <div class="small text-muted">@m_Edit.Title</div>
+            </div>
+
+            <button type="button" class="btn-close" aria-label="Close" @onclick="CloseEditor"></button>
+        </div>
+
+        <div class="offcanvas-body">
+            <EditForm Model="m_Edit" OnValidSubmit="SaveEditAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Title</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Title" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Date</label>
+                        <InputDate class="form-control" @bind-Value="m_Edit.Date" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Hours</label>
+                        <InputNumber class="form-control"
+                                     @bind-Value="m_Edit.Hours"
+                                     disabled="@(!CanEditHours)" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="m_Edit.Description" />
+                    </div>
+
+                    <hr class="my-2" />
+
+                    <div class="col-md-6">
+                        <label class="form-label">Contact Name</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactName" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Contact Email</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactEmail" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Contact Phone</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.ContactPhone" />
+                    </div>
+
+                    <hr class="my-2" />
+
+                    <div class="col-12">
+                        <label class="form-label">Street 1</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Street1" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Street 2</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.Street2" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">City</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.City" />
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">State</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.State" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Postal Code</label>
+                        <InputText class="form-control" @bind-Value="m_Edit.PostalCode" />
+                    </div>
+                </div>
+
+                <div class="sp-panel-actions d-flex gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                        @(m_Busy ? "Saving..." : "Save")
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseEditor" disabled="@(m_Busy)">
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private List<OpportunityManagementService.OpportunityRow>? m_Items;
+    private string m_Search = "";
+    private bool m_Busy;
+    private string? m_Status;
+    private string? m_Error;
+
+    private bool m_ShowCreate;
+    private OpportunityManagementService.CreateModel m_Create = new();
+
+    private OpportunityManagementService.ActorContext? m_Actor;
+
+    private bool m_ShowEditor;
+    private OpportunityManagementService.EditModel? m_Edit;
+
+    protected override async Task OnInitializedAsync()
+        => await Reload();
+
+    private IEnumerable<OpportunityManagementService.OpportunityRow> Filtered =>
+        string.IsNullOrWhiteSpace(m_Search)
+            ? (m_Items ?? Enumerable.Empty<OpportunityManagementService.OpportunityRow>())
+            : (m_Items ?? Enumerable.Empty<OpportunityManagementService.OpportunityRow>())
+                .Where(o =>
+                    (o.Title ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase) ||
+                    (o.ContactName ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase) ||
+                    (o.City ?? "").Contains(m_Search, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanEditHours => m_Actor?.CanApprove ?? false;
+
+    private bool IsOrganizerLocked(OpportunityManagementService.OpportunityRow row)
+    {
+        if (m_Actor is null) return true;
+
+        // Only organizers are blocked after date; instructor/admin can still clean up
+        if (m_Actor.CanApprove) return false;
+
+        return row.Date.Date < DateTime.Today;
+    }
+
+    private void ToggleCreate() => m_ShowCreate = !m_ShowCreate;
+    private void ClearCreate() => m_Create = new OpportunityManagementService.CreateModel();
+
+    private async Task Reload()
+    {
+        ClearMessages();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            m_Error = "Unable to determine current user.";
+            return;
+        }
+
+        m_Actor = new OpportunityManagementService.ActorContext(
+            userId,
+            IsOrganizer: user.IsInRole(Roles.Organizer),
+            IsInstructor: user.IsInRole(Roles.Instructor),
+            IsAdmin: user.IsInRole(Roles.Admin));
+
+        m_Items = await Opps.GetAllAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
+
+            m_Busy = true;
+            ClearMessages();
+
+            var (ok, msg) = await Opps.CreateAsync(m_Create, m_Actor);
+            if (!ok) { m_Error = msg; return; }
+
+            m_Status = msg;
+            m_Create = new OpportunityManagementService.CreateModel();
+            m_ShowCreate = false;
+
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private void OpenEditor(OpportunityManagementService.OpportunityRow row)
+    {
+        m_Edit = new OpportunityManagementService.EditModel
+        {
+            Id = row.Id,
+            Title = row.Title,
+            Date = row.Date,
+            Hours = row.Hours,
+            WasApproved = row.IsApproved,
+            CreatedByUserId = row.CreatedByUserId,
+
+            ContactName = row.ContactName ?? "",
+            ContactEmail = row.ContactEmail,
+            ContactPhone = row.ContactPhone,
+            City = row.City ?? ""
+        };
+
+        m_ShowEditor = true;
+    }
+
+    private void CloseEditor()
+    {
+        m_ShowEditor = false;
+        m_Edit = null;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        try
+        {
+            if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
+            if (m_Edit is null) return;
+
+            m_Busy = true;
+            ClearMessages();
+
+            var (ok, msg) = await Opps.UpdateAsync(m_Edit, m_Actor);
+            if (!ok) { m_Error = msg; return; }
+
+            m_Status = msg;
+            CloseEditor();
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        try
+        {
+            if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
+
+            m_Busy = true;
+            ClearMessages();
+
+            var (ok, msg) = await Opps.DeleteAsync(id, m_Actor);
+            if (!ok) { m_Error = msg; return; }
+
+            m_Status = msg;
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private async Task ApproveAsync(int id)
+    {
+        try
+        {
+            if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
+
+            m_Busy = true;
+            ClearMessages();
+
+            var (ok, msg) = await Opps.ApproveAsync(id, m_Actor);
+            if (!ok) { m_Error = msg; return; }
+
+            m_Status = msg;
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private async Task UnapproveAsync(int id)
+    {
+        try
+        {
+            if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
+
+            m_Busy = true;
+            ClearMessages();
+
+            var (ok, msg) = await Opps.UnapproveAsync(id, m_Actor);
+            if (!ok) { m_Error = msg; return; }
+
+            m_Status = msg;
+            await Reload();
+        }
+        catch (Exception ex) { m_Error = ex.Message; }
+        finally { m_Busy = false; }
+    }
+
+    private void ClearMessages()
+    {
+        m_Status = null;
+        m_Error = null;
+    }
+}

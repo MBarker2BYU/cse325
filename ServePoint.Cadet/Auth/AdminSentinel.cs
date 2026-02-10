@@ -38,4 +38,5 @@ public class AdminSentinel
     public static bool IsProtectedAdmin(string? userEmail, IConfiguration config)
         => !string.IsNullOrWhiteSpace(userEmail)
            && string.Equals(userEmail, GetProtectedAdminEmail(config), StringComparison.OrdinalIgnoreCase);
+
 }

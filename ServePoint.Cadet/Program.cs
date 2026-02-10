@@ -6,6 +6,7 @@ using ServePoint.Cadet.Components;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Initialization;
+using ServePoint.Cadet.Data.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,10 @@ builder.Services
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+//Services
+builder.Services.AddScoped<UserManagementService>();
+
 
 var app = builder.Build();
 

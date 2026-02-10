@@ -2,18 +2,12 @@
 @rendermode InteractiveServer
 
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
 @using ServePoint.Cadet.Auth
-@using ServePoint.Cadet.Data
+@using ServePoint.Cadet.Data.Services
 
 @attribute [Authorize(Roles = Roles.Admin)]
 
-@inject UserManager<ApplicationUser> UserManager
-@inject RoleManager<IdentityRole> RoleManager
-@inject ApplicationDbContext Db
-@inject IConfiguration Configuration
+@inject UserManagementService UserMgmt
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>User Management</PageTitle>
@@ -50,9 +44,10 @@ else
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 35%"><span class="sp-label">Email / Username</span></th>
-                        <th style="width: 35%"><span class="sp-label">Roles</span></th>
-                        <th style="width: 30%"><span class="sp-label">Actions</span></th>
+                        <th style="width: 25%"><span class="sp-label">Email / Username</span></th>
+                        <th style="width: 10%"><span class="sp-label">Status</span></th>
+                        <th style="width: 20%"><span class="sp-label">Roles</span></th>
+                        <th style="width: 45%"><span class="sp-label">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,7 +58,7 @@ else
                                 <div class="d-flex align-items-center gap-2">
                                     <b>@(r.Email ?? r.UserName)</b>
 
-                                    @if (AdminSentinel.IsProtectedAdmin(r.Email, Configuration))
+                                    @if (IsProtectedAdmin(r.Email))
                                     {
                                         <span class="badge bg-warning text-dark"
                                               title="This is the built-in admin account and cannot be demoted from Admin.">
@@ -74,6 +69,18 @@ else
 
                                 <div class="text-muted" style="font-size: 0.9em">@r.Id</div>
                             </td>
+                            
+                            <td>
+                                @if (IsSuspended(r))
+                                {
+                                    <span class="badge bg-danger">Suspended</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                            </td>
+
 
                             <td>
                                 @if (r.Roles.Count == 0)
@@ -90,38 +97,71 @@ else
                             </td>
 
                             <td>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <select class="form-select form-select-sm" style="width: 160px"
-                                            @bind="r.SelectedRoleToAdd">
-                                        <option value="">Add role…</option>
-                                        @foreach (var role in GetAddableRoles(r))
-                                        {
-                                            <option value="@role">@role</option>
-                                        }
-                                    </select>
+                                <div class="d-flex flex-column gap-2">
 
-                                    <button class="btn btn-sm btn-primary"
-                                            disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToAdd)"
-                                            @onclick="() => AddRole(r.Id, r.SelectedRoleToAdd!)">
-                                        Add
-                                    </button>
+                                    <div class="d-flex gap-3 align-items-start flex-wrap w-100 justify-content-end">
 
-                                    <select class="form-select form-select-sm" style="width: 160px"
-                                            @bind="r.SelectedRoleToRemove">
-                                        <option value="">Remove role…</option>
-                                        @foreach (var role in GetRemovableRoles(r))
-                                        {
-                                            <option value="@role">@role</option>
-                                        }
-                                    </select>
+                                        <!-- Left: account actions -->
+                                        <div style="min-width: 110px">
+                                            @if (CanShowSuspendControls(r))
+                                            {
+                                                if (IsSuspended(r))
+                                                {
+                                                    <button class="btn btn-sm btn-outline-success"
+                                                            @onclick="() => Unsuspend(r.Id)">
+                                                        Unsuspend
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => Suspend(r.Id)">
+                                                        Suspend
+                                                    </button>
+                                                }
+                                            }
+                                        </div>
 
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
-                                            @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
-                                        Remove
-                                    </button>
+                                        <!-- Right: role actions -->
+                                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                                            <select class="form-select form-select-sm" style="width: 160px"
+                                                    @bind="r.SelectedRoleToAdd">
+                                                <option value="">Add role…</option>
+                                                @foreach (var role in GetAddableRoles(r))
+                                                {
+                                                    <option value="@role">@role</option>
+                                                }
+                                            </select>
+
+                                            <button class="btn btn-sm btn-primary"
+                                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToAdd)"
+                                                    @onclick="() => AddRole(r.Id, r.SelectedRoleToAdd!)">
+                                                Add
+                                            </button>
+
+                                            <select class="form-select form-select-sm" style="width: 160px"
+                                                    @bind="r.SelectedRoleToRemove">
+                                                <option value="">Remove role…</option>
+                                                @foreach (var role in GetRemovableRoles(r))
+                                                {
+                                                    <option value="@role">@role</option>
+                                                }
+                                            </select>
+
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
+                                                    @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+
+
                                 </div>
                             </td>
+
+
+
                         </tr>
                     }
                 </tbody>
@@ -137,7 +177,7 @@ else
     private string? m_Error;
 
     private string? m_CurrentUserId;
-    private string? m_ProtectedAdminEmail;
+    private string m_ProtectedAdminEmail = "";
     private int m_AdminCount;
 
     protected override async Task OnInitializedAsync()
@@ -154,51 +194,49 @@ else
     {
         ClearMessages();
 
-        // Cache for dropdown filtering / removal rules
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        m_CurrentUserId = UserManager.GetUserId(authState.User);
-        m_ProtectedAdminEmail = AdminSentinel.GetProtectedAdminEmail(Configuration);
-        m_AdminCount = (await UserManager.GetUsersInRoleAsync(Roles.Admin)).Count;
+        m_CurrentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        var users = await UserManager.Users
-            .AsNoTracking()
-            .OrderBy(u => u.Email)
-            .Select(u => new { u.Id, u.Email, u.UserName })
-            .ToListAsync();
+        var result = await UserMgmt.LoadAsync(m_CurrentUserId);
 
-        // Single query for all user->role names (no N+1)
-        var userRoles = await (
-            from ur in Db.UserRoles
-            join r in Db.Roles on ur.RoleId equals r.Id
-            select new { ur.UserId, RoleName = r.Name! }
-        ).ToListAsync();
+        m_CurrentUserId = result.CurrentUserId;
+        m_ProtectedAdminEmail = result.ProtectedAdminEmail;
+        m_AdminCount = result.AdminCount;
 
-        var roleLookup = userRoles
-            .GroupBy(x => x.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).ToList());
-
-        var rows = new List<UserRow>(users.Count);
-        foreach (var u in users)
+        // Convert service DTO -> page row (adds dropdown selections)
+        m_Rows = result.Rows.Select(r => new UserRow
         {
-            roleLookup.TryGetValue(u.Id, out var roles);
-            rows.Add(new UserRow
-            {
-                Id = u.Id,
-                Email = u.Email,
-                UserName = u.UserName,
-                Roles = roles ?? new List<string>()
-            });
-        }
+            Id = r.Id,
+            Email = r.Email,
+            UserName = r.UserName,
+            Roles = r.Roles,
+            LockoutEndUtc = r.LockoutEndUtc
+        }).ToList();
 
-        m_Rows = rows;
+
         NormalizeSelections();
     }
 
+    private bool IsProtectedAdmin(string? email)
+        => !string.IsNullOrWhiteSpace(email)
+           && string.Equals(email, m_ProtectedAdminEmail, StringComparison.OrdinalIgnoreCase);
+
     private IEnumerable<string> GetAddableRoles(UserRow r)
     {
-        var current = r.Roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return Roles.All.Where(role => !current.Contains(role));
+        // Hierarchy: User < Organizer < Instructor < Admin
+        var hasAdmin = r.Roles.Any(x => x.Equals(Roles.Admin, StringComparison.OrdinalIgnoreCase));
+        if (hasAdmin) return Array.Empty<string>();
+
+        var hasInstructor = r.Roles.Any(x => x.Equals(Roles.Instructor, StringComparison.OrdinalIgnoreCase));
+        if (hasInstructor) return new[] { Roles.Admin };
+
+        var hasOrganizer = r.Roles.Any(x => x.Equals(Roles.Organizer, StringComparison.OrdinalIgnoreCase));
+        if (hasOrganizer) return new[] { Roles.Instructor, Roles.Admin };
+
+        // Default: treat as User-level (or no roles)
+        return new[] { Roles.Organizer, Roles.Instructor, Roles.Admin };
     }
+
 
     private IEnumerable<string> GetRemovableRoles(UserRow r)
     {
@@ -214,17 +252,13 @@ else
         if (!role.Equals(Roles.Admin, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        // Built-in protected admin can never lose Admin
-        if (!string.IsNullOrWhiteSpace(m_ProtectedAdminEmail) &&
-            string.Equals(target.Email, m_ProtectedAdminEmail, StringComparison.OrdinalIgnoreCase))
+        if (IsProtectedAdmin(target.Email))
             return false;
 
-        // Current admin cannot remove Admin from self
         if (!string.IsNullOrWhiteSpace(m_CurrentUserId) &&
             string.Equals(target.Id, m_CurrentUserId, StringComparison.Ordinal))
             return false;
 
-        // Cannot remove the last Admin
         if (m_AdminCount <= 1)
             return false;
 
@@ -257,33 +291,10 @@ else
         {
             ClearMessages();
 
-            if (!await RoleManager.RoleExistsAsync(role))
-            {
-                m_Error = $"Role '{role}' does not exist.";
-                return;
-            }
+            var (ok, message) = await UserMgmt.AddRoleAsync(userId, role);
+            if (!ok) { m_Error = message; return; }
 
-            var user = await UserManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                m_Error = "User not found.";
-                return;
-            }
-
-            if (await UserManager.IsInRoleAsync(user, role))
-            {
-                m_Status = $"User already has role '{role}'.";
-                return;
-            }
-
-            var result = await UserManager.AddToRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                m_Error = string.Join(" | ", result.Errors.Select(e => e.Description));
-                return;
-            }
-
-            m_Status = $"Added '{role}' to {(user.Email ?? user.UserName)}.";
+            m_Status = message;
             await LoadAsync();
         }
         catch (Exception ex)
@@ -298,51 +309,15 @@ else
         {
             ClearMessages();
 
-            var user = await UserManager.FindByIdAsync(userId);
-            if (user is null)
-            {
-                m_Error = "User not found.";
-                return;
-            }
+            var (ok, message) = await UserMgmt.RemoveRoleAsync(
+                userId,
+                role,
+                m_CurrentUserId,
+                m_AdminCount);
 
-            if (!await UserManager.IsInRoleAsync(user, role))
-            {
-                m_Status = $"User does not have role '{role}'.";
-                return;
-            }
+            if (!ok) { m_Error = message; return; }
 
-            if (role.Equals(Roles.Admin, StringComparison.OrdinalIgnoreCase))
-            {
-                if (AdminSentinel.IsProtectedAdmin(user.Email, Configuration))
-                {
-                    m_Error = $"You cannot remove Admin from the built-in admin account ({AdminSentinel.GetProtectedAdminEmail(Configuration)}).";
-                    return;
-                }
-
-                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-                var currentUserId = UserManager.GetUserId(authState.User);
-                if (!string.IsNullOrWhiteSpace(currentUserId) && currentUserId == userId)
-                {
-                    m_Error = "You cannot remove Admin from yourself.";
-                    return;
-                }
-
-                var admins = await UserManager.GetUsersInRoleAsync(Roles.Admin);
-                if (admins.Count <= 1)
-                {
-                    m_Error = "You must have at least one Admin account.";
-                    return;
-                }
-            }
-
-            var result = await UserManager.RemoveFromRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                m_Error = string.Join(" | ", result.Errors.Select(e => e.Description));
-                return;
-            }
-
-            m_Status = $"Removed '{role}' from {(user.Email ?? user.UserName)}.";
+            m_Status = message;
             await LoadAsync();
         }
         catch (Exception ex)
@@ -357,6 +332,60 @@ else
         m_Error = null;
     }
 
+    private bool IsSuspended(UserRow r)
+        => r.LockoutEndUtc.HasValue && r.LockoutEndUtc.Value > DateTimeOffset.UtcNow;
+
+    private bool CanShowSuspendControls(UserRow r)
+    {
+        if (IsProtectedAdmin(r.Email))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(m_CurrentUserId) &&
+            string.Equals(r.Id, m_CurrentUserId, StringComparison.Ordinal))
+            return false;
+
+        return true;
+    }
+
+
+    private async Task Suspend(string userId)
+    {
+        try
+        {
+            ClearMessages();
+
+            var (ok, message) = await UserMgmt.SuspendAsync(userId, m_CurrentUserId);
+            if (!ok) { m_Error = message; return; }
+
+            m_Status = message;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+    }
+
+    private async Task Unsuspend(string userId)
+    {
+        try
+        {
+            ClearMessages();
+
+            var (ok, message) = await UserMgmt.UnsuspendAsync(userId);
+            if (!ok) { m_Error = message; return; }
+
+            m_Status = message;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+    }
+
+
+    // Page-only row type (keeps dropdown selections)
     private sealed class UserRow
     {
         public string Id { get; set; } = "";
@@ -366,5 +395,7 @@ else
 
         public string? SelectedRoleToAdd { get; set; }
         public string? SelectedRoleToRemove { get; set; }
+
+        public DateTimeOffset? LockoutEndUtc { get; set; }
     }
 }

@@ -7,7 +7,7 @@
 }
 
 @code {
-    private string? messageFromCookie;
+    private string? m_MessageFromCookie;
 
     [Parameter]
     public string? Message { get; set; }
@@ -15,15 +15,15 @@
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    private string? DisplayMessage => Message ?? messageFromCookie;
+    private string? DisplayMessage => Message ?? m_MessageFromCookie;
 
     protected override void OnInitialized()
     {
-        messageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.StatusCookieName];
+        m_MessageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.STATUS_COOKIE_NAME];
 
-        if (messageFromCookie is not null)
+        if (m_MessageFromCookie is not null)
         {
-            HttpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            HttpContext.Response.Cookies.Delete(IdentityRedirectManager.STATUS_COOKIE_NAME);
         }
     }
 }

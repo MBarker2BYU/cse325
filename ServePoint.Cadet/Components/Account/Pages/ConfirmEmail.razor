@@ -11,10 +11,10 @@
 <PageTitle>Confirm email</PageTitle>
 
 <h1>Confirm email</h1>
-<StatusMessage Message="@statusMessage" />
+<StatusMessage Message="@m_StatusMessage" />
 
 @code {
-    private string? statusMessage;
+    private string? m_StatusMessage;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -37,13 +37,13 @@
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = $"Error loading user with ID {UserId}";
+            m_StatusMessage = $"Error loading user with ID {UserId}";
         }
         else
         {
             var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
             var result = await UserManager.ConfirmEmailAsync(user, code);
-            statusMessage = result.Succeeded ? "Thank you for confirming your email." : "Error confirming your email.";
+            m_StatusMessage = result.Succeeded ? "Thank you for confirming your email." : "Error confirming your email.";
         }
     }
 }
