@@ -40,8 +40,16 @@ public static class DatabaseInitializer
         }
 
         // 1. Create database if needed (SQLite-safe)
-        await db.Database.MigrateAsync();
-
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("PendingModelChangesWarning"))
+        {
+            throw new InvalidOperationException(
+                "Database schema is out of date. Run: dotnet ef migrations add <Name> && dotnet ef database update", ex);
+        }
+        
         // 2. Now verify connectivity
         if (!await db.Database.CanConnectAsync())
             throw new InvalidOperationException("Database not reachable after migration");

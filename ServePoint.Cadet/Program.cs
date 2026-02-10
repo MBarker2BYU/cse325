@@ -47,7 +47,8 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 //Services
 builder.Services.AddScoped<UserManagementService>();
-
+builder.Services.AddScoped<OpportunityManagementService>();
+builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 

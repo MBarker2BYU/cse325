@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServePoint.Cadet.Data;
 
@@ -10,9 +11,11 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260210193807_RemoveCompletedFieldsFromSignup")]
+    partial class RemoveCompletedFieldsFromSignup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -339,13 +342,13 @@ namespace ServePoint.Cadet.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ApprovedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<bool>("AttendanceApproved")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AttendanceApprovedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AttendanceApprovedByUserId")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("AttendanceSubmitted")
@@ -353,6 +356,12 @@ namespace ServePoint.Cadet.Migrations
 
                     b.Property<DateTime?>("AttendanceSubmittedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("SignedUpAt")
                         .HasColumnType("TEXT");

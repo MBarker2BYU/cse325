@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Components\Pages\Counter.razor" />
+    <Content Remove="Components\Pages\Home.razor" />
+    <Content Remove="Components\Pages\Weather.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Data\app.db" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 

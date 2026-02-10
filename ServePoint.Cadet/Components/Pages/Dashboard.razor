@@ -1,0 +1,563 @@
+﻿@page "/"
+@page "/dashboard"
+@rendermode InteractiveServer
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using ServePoint.Cadet.Auth
+@using ServePoint.Cadet.Data.Services
+@using ServePoint.Cadet.Models.Entities
+
+@attribute [Authorize]
+
+@inject DashboardService DashboardService
+@inject OpportunityManagementService OpportunityService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Config
+@inject IJSRuntime JS
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+@if (!string.IsNullOrWhiteSpace(m_Status))
+{
+    <div class="alert alert-info">@m_Status</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(m_Error))
+{
+    <div class="alert alert-danger">@m_Error</div>
+}
+
+@if (m_Data is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    @* ===== Summary Cards ===== *@
+    <div class="row g-3 mb-3">
+
+        @if (m_Data.Actor.AccruesHours)
+        {
+            <div class="col-md-4">
+                <div class="card sp-card shadow-sm">
+                    <div class="card-body">
+                        <div class="text-muted small">Approved Hours</div>
+                        <div class="display-6">@m_Data.TotalApprovedHours</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card sp-card shadow-sm">
+                    <div class="card-body">
+                        <div class="text-muted small">Approved Opportunities</div>
+                        <div class="display-6">@m_Data.TotalApprovedCount</div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="col-md-4">
+            <div class="card sp-card shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Upcoming Signups</div>
+                    <div class="display-6">@m_Data.UpcomingSignedUpCount</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ===== Progress (Users/Organizers only) ===== *@
+    @if (m_Data.Actor.AccruesHours)
+    {
+        <div class="sp-progress-shell mb-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <div class="sp-label">Service Progress</div>
+                    <div class="sp-value">@ProgressText</div>
+                </div>
+                <div class="text-end">
+                    <span class="sp-progress-badge">@ProgressPercent%</span>
+                </div>
+            </div>
+
+            <div class="progress mt-2" role="progressbar" aria-valuenow="@ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" style="width:@($"{ProgressPercent}%")"></div>
+            </div>
+        </div>
+    }
+
+    @* ===== Available Opportunities (Users/Organizers only) ===== *@
+    @if (m_Data.Actor.AccruesHours)
+    {
+        <h2 class="h5 mt-4">Available Opportunities</h2>
+
+        @if (m_Available.Count == 0)
+        {
+            <div class="alert alert-secondary">
+                No approved opportunities are currently available for you to sign up.
+            </div>
+        }
+        else
+        {
+            <div class="sp-table-shell mb-4">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 34%">Title</th>
+                                <th style="width: 14%">Date</th>
+                                <th style="width: 10%">Hours</th>
+                                <th style="width: 26%">Contact</th>
+                                <th style="width: 16%">City</th>
+                                <th class="text-end" style="width: 10%">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in m_Available)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@o.Title</td>
+                                    <td>@o.Date.ToShortDateString()</td>
+                                    <td>@o.Hours</td>
+                                    <td>@o.Contact?.Name</td>
+                                    <td class="text-muted">@o.Contact?.Address?.City</td>
+                                    <td class="text-end text-nowrap">
+                                        <button class="btn btn-sm btn-primary"
+                                                disabled="@m_Busy"
+                                                @onclick="() => Signup(o.Id)">
+                                            Sign Up
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+
+    @* ===== My Signups ===== *@
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h5 mb-0">My Signups</h2>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@m_Busy">
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    @if (m_Data.MySignups.Count == 0)
+    {
+        <div class="alert alert-info">
+            You don’t have any signups yet.
+        </div>
+    }
+    else
+    {
+        <div class="sp-table-shell">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 28%">Opportunity</th>
+                            <th style="width: 14%">Date</th>
+                            <th style="width: 10%">Hours</th>
+                            <th style="width: 14%">Status</th>
+                            <th style="width: 22%">Contact</th>
+                            <th class="text-end" style="width: 12%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in m_Data.MySignups)
+                        {
+                            var opp = s.VolunteerOpportunity;
+                            var isPast = opp.Date.Date < DateTime.Today;
+                            var canWithdraw = !isPast && !s.AttendanceSubmitted && !s.AttendanceApproved;
+
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@opp.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(opp.Description))
+                                    {
+                                        <div class="text-muted small text-truncate" style="max-width: 520px" title="@opp.Description">
+                                            @opp.Description
+                                        </div>
+                                    }
+                                </td>
+                                <td>@opp.Date.ToShortDateString()</td>
+                                <td>@opp.Hours</td>
+                                <td>
+                                    @if (s.AttendanceApproved)
+                                    {
+                                        <span class="badge bg-success">Approved</span>
+                                    }
+                                    else if (s.AttendanceSubmitted)
+                                    {
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Signed Up</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">@opp.Contact?.Name</div>
+                                    <div class="text-muted small">
+                                        @if (!string.IsNullOrWhiteSpace(opp.Contact?.Email))
+                                        {
+                                            <span>@opp.Contact!.Email</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(opp.Contact?.Phone))
+                                        {
+                                            <span>@(string.IsNullOrWhiteSpace(opp.Contact?.Email) ? "" : " • ")@opp.Contact!.Phone</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    @if (!s.AttendanceApproved)
+                                    {
+                                        if (!s.AttendanceSubmitted)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    disabled="@m_Busy"
+                                                    title="Submit hours for approval"
+                                                    @onclick="() => Submit(s.Id)">
+                                                Submit
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Waiting</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">Done</span>
+                                    }
+
+                                    @if (canWithdraw)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger ms-1"
+                                                disabled="@m_Busy"
+                                                @onclick="() => ConfirmWithdraw(s.Id)">
+                                            Withdraw
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @* ===== Instructor/Admin Approval Queue ===== *@
+    @if (m_Data.Actor.CanApprove)
+    {
+        <h2 class="h5 mt-4">Pending Attendance Approvals</h2>
+
+        @if (m_Data.PendingAttendance.Count == 0)
+        {
+            <div class="alert alert-secondary">No attendance submissions pending approval.</div>
+        }
+        else
+        {
+            <div class="sp-table-shell mb-4">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%">Opportunity</th>
+                                <th style="width: 14%">Date</th>
+                                <th style="width: 16%">Cadet</th>
+                                <th style="width: 20%">Submitted</th>
+                                <th class="text-end" style="width: 20%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in m_Data.PendingAttendance)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@s.VolunteerOpportunity.Title</td>
+                                    <td>@s.VolunteerOpportunity.Date.ToShortDateString()</td>
+                                    <td class="text-muted">@s.UserId</td>
+                                    <td class="text-muted">@((s.AttendanceSubmittedAt?.ToLocalTime().ToString("g")) ?? "")</td>
+                                    <td class="text-end text-nowrap">
+                                        <button class="btn btn-sm btn-success"
+                                                disabled="@m_Busy"
+                                                @onclick="() => ApproveAttendance(s.Id)">
+                                            Approve
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger ms-1"
+                                                disabled="@m_Busy"
+                                                @onclick="() => RejectAttendance(s.Id)">
+                                            Reject
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <h2 class="h5 mt-4">Pending Opportunity Approvals</h2>
+
+        @if (m_Data.PendingOpportunities.Count == 0)
+        {
+            <div class="alert alert-secondary">No opportunities pending approval.</div>
+        }
+        else
+        {
+            <div class="sp-table-shell">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%">Title</th>
+                                <th style="width: 14%">Date</th>
+                                <th style="width: 10%">Hours</th>
+                                <th style="width: 24%">Contact</th>
+                                <th class="text-end" style="width: 12%">Go</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in m_Data.PendingOpportunities)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@o.Title</td>
+                                    <td>@o.Date.ToShortDateString()</td>
+                                    <td>@o.Hours</td>
+                                    <td class="text-muted">@o.Contact?.Name</td>
+                                    <td class="text-end text-nowrap">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           href="opportunities/manage">
+                                            Open
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private DashboardService.DashboardData? m_Data;
+
+    private bool m_Busy;
+    private string? m_Error;
+    private string? m_Status;
+
+    private List<VolunteerOpportunity> m_Available = [];
+
+    private int m_RequiredHours;
+
+    protected override async Task OnInitializedAsync()
+    {
+        m_RequiredHours = Config.GetValue<int>("CadetRequirements:RequiredHours");
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                m_Error = "Unable to determine current user.";
+                return;
+            }
+
+            var actor = new DashboardService.ActorContext(
+                UserId: userId,
+                IsUser: user.IsInRole(Roles.User),
+                IsOrganizer: user.IsInRole(Roles.Organizer),
+                IsInstructor: user.IsInRole(Roles.Instructor),
+                IsAdmin: user.IsInRole(Roles.Admin)
+            );
+
+            m_Data = await DashboardService.LoadAsync(actor);
+
+            // Only fetch available opportunities for roles that sign up / accrue hours
+            m_Available = actor.AccruesHours
+                ? await OpportunityService.GetApprovedAvailableForUserAsync(userId)
+                : [];
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private async Task Submit(int signupId)
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            if (m_Data is null) { m_Error = "Dashboard not loaded."; return; }
+
+            var (ok, err) = await DashboardService.SubmitAttendanceAsync(m_Data.Actor.UserId, signupId);
+            if (!ok) { m_Error = err; return; }
+
+            m_Status = "Submitted for approval.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private async Task ApproveAttendance(int signupId)
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            if (m_Data is null) { m_Error = "Dashboard not loaded."; return; }
+
+            var (ok, err) = await DashboardService.ApproveAttendanceAsync(signupId, m_Data.Actor);
+            if (!ok) { m_Error = err; return; }
+
+            m_Status = "Attendance approved.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private async Task RejectAttendance(int signupId)
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            if (m_Data is null) { m_Error = "Dashboard not loaded."; return; }
+
+            var (ok, err) = await DashboardService.RejectAttendanceAsync(signupId, m_Data.Actor);
+            if (!ok) { m_Error = err; return; }
+
+            m_Status = "Attendance rejected.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private async Task Signup(int opportunityId)
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            if (m_Data is null) { m_Error = "Dashboard not loaded."; return; }
+
+            var (ok, err) = await OpportunityService.SignupAsync(opportunityId, m_Data.Actor.UserId);
+            if (!ok) { m_Error = err; return; }
+
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private async Task ConfirmWithdraw(int signupId)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "Withdraw from this opportunity?");
+        if (!ok) return;
+
+        await Withdraw(signupId);
+    }
+
+    private async Task Withdraw(int signupId)
+    {
+        try
+        {
+            m_Busy = true;
+            ClearMessages();
+
+            if (m_Data is null) { m_Error = "Dashboard not loaded."; return; }
+
+            var (ok, err) = await DashboardService.WithdrawAsync(m_Data.Actor.UserId, signupId);
+            if (!ok) { m_Error = err; return; }
+
+            m_Status = "Withdrawn.";
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            m_Error = ex.Message;
+        }
+        finally
+        {
+            m_Busy = false;
+        }
+    }
+
+    private void ClearMessages()
+    {
+        m_Status = null;
+        m_Error = null;
+    }
+
+    private int ProgressPercent =>
+        (m_Data is null || !m_Data.Actor.AccruesHours || m_RequiredHours <= 0)
+            ? 0
+            : Math.Clamp((int)Math.Round(100.0 * m_Data.TotalApprovedHours / m_RequiredHours), 0, 100);
+
+    private string ProgressText =>
+        (m_Data is null || !m_Data.Actor.AccruesHours || m_RequiredHours <= 0)
+            ? $"{m_Data?.TotalApprovedHours ?? 0} hours"
+            : $"{m_Data.TotalApprovedHours} / {m_RequiredHours} hours";
+}

@@ -42,4 +42,8 @@ public class VolunteerOpportunity
 
     public DateTime? ApprovedAt { get; set; }
 
+    public bool IsDeletionRequested { get; set; }
+    public DateTime? DeletionRequestedAt { get; set; }
+    public string? DeletionRequestedByUserId { get; set; }
+
 }

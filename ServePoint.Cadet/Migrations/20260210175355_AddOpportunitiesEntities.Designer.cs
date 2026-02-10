@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServePoint.Cadet.Data;
 
@@ -10,9 +11,11 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260210175355_AddOpportunitiesEntities")]
+    partial class AddOpportunitiesEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -298,12 +301,6 @@ namespace ServePoint.Cadet.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeletionRequestedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DeletionRequestedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -312,9 +309,6 @@ namespace ServePoint.Cadet.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsApproved")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeletionRequested")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Location")
@@ -339,20 +333,11 @@ namespace ServePoint.Cadet.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ApprovedByUserId")
+                    b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("AttendanceApproved")
+                    b.Property<bool>("IsCompleted")
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("AttendanceApprovedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("AttendanceSubmitted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("AttendanceSubmittedAt")
-                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("SignedUpAt")
                         .HasColumnType("TEXT");
