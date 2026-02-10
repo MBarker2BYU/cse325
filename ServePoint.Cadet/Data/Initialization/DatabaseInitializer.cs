@@ -50,5 +50,6 @@ public static class DatabaseInitializer
         await InitializeRoles.RunAsync(scope.ServiceProvider);
         await InitializeIdentity.RunAsync(scope.ServiceProvider);
         await InitializeServePoint.RunAsync(scope.ServiceProvider);
+        await InitializeDefaultUserRole.RunAsync(scope.ServiceProvider);
     }
 }

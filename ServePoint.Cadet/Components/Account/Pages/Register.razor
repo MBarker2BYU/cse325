@@ -5,6 +5,7 @@
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
+@using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data
 
 @inject UserManager<ApplicationUser> UserManager
@@ -84,6 +85,8 @@
             identityErrors = result.Errors;
             return;
         }
+
+        await UserManager.AddToRoleAsync(user, Roles.User);
 
         Logger.LogInformation("User created a new account with password.");
 
