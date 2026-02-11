@@ -48,4 +48,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     /// <value>The volunteer signups.</value>
     public DbSet<VolunteerSignup> VolunteerSignups => Set<VolunteerSignup>();
 
+    /// <summary>
+    /// Gets the user emblems.
+    /// </summary>
+    /// <value>The user emblems.</value>
+    public DbSet<UserEmblem> UserEmblems => Set<UserEmblem>();
 }

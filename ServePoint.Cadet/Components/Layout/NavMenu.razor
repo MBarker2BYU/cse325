@@ -1,7 +1,11 @@
 ﻿@using ServePoint.Cadet.Auth
+@using ServePoint.Cadet.Data
+@using ServePoint.Cadet.Extensions
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -11,98 +15,125 @@
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        @* <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+<!-- IMPORTANT:
+     .nav-scrollable MUST remain a sibling of .navbar-toggler
+     because AppMenu.razor.css uses:
+     .navbar-toggler:checked ~ .nav-scrollable { display:block; }
+-->
+<div class="nav-scrollable sp-navshell" onclick="document.querySelector('.navbar-toggler').click()">
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+    <!-- SCROLLING AREA -->
+    <div class="sp-navscroll">
+        <nav class="nav flex-column">
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div> *@
+            <AuthorizeView Roles="@($"{Roles.User},{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")">
+                <Authorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link sp-nav-link" href="opportunities/manage" Match="NavLinkMatch.Prefix">
+                            <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span>
+                            <span class="ms-2">Opportunities</span>
+                        </NavLink>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
 
-        @* <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div> *@
-        
-        
+            <AuthorizeView Roles="@Roles.Admin">
+                <Authorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link sp-nav-link" href="admin/users" Match="NavLinkMatch.Prefix">
+                            <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span>
+                            User Management
+                            <span class="badge bg-warning text-dark ms-2" title="Admin only">Protected</span>
+                        </NavLink>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
 
-        <AuthorizeView Roles="@($"{Roles.User},{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")">
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link sp-nav-link" href="opportunities/manage" Match="NavLinkMatch.Prefix">
-                        <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span>
-                        <span class="ms-2">Opportunities</span>
-                    </NavLink>
-                </div>
-            </Authorized>
-        </AuthorizeView>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="nav-item px-3">
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@m_CurrentUrl" />
+                            <button type="submit" class="nav-link">
+                                <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
+                                Logout
+                            </button>
+                        </form>
+                    </div>
+                </Authorized>
 
-        <AuthorizeView Roles="@Roles.Admin">
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link sp-nav-link" href="admin/users" Match="NavLinkMatch.Prefix">
-                        <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span>
-                        User Management
-                        <span class="badge bg-warning text-dark ms-2" title="Admin only">Protected</span>
-                    </NavLink>
-                </div>
-            </Authorized>
-        </AuthorizeView>
+                <NotAuthorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="Account/Register">
+                            <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
+                            Register
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="Account/Login">
+                            <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span>
+                            Login
+                        </NavLink>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
 
+        </nav>
+    </div>
+
+    <!-- LOCKED BOTTOM AREA (NO SCROLL) -->
+    <div class="sp-sidebar-bottom">
 
         <AuthorizeView>
             <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@m_CurrentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
+                <a class="sp-usercard-link" href="Account/Manage" onclick="event.stopPropagation();">
+                    <div class="sp-usercard sp-usercard-big">
+                        @if (!string.IsNullOrWhiteSpace(m_EmblemPath))
+                        {
+                            <img class="sp-usercard-emblem sp-usercard-emblem-big"
+                                 src="@m_EmblemPath"
+                                 alt="@m_Emblem.ToDisplay()" />
+                        }
+
+                        <div class="sp-usercard-service">@m_Emblem.ToDisplay()</div>
+                        <div class="sp-usercard-identity">@context.User.Identity?.Name</div>
+                    </div>
+                </a>
             </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
         </AuthorizeView>
-    </nav>
+
+        <div class="sp-sidebar-footer" onclick="event.stopPropagation();">
+            <NavLink href="about" class="nav-link">About</NavLink>
+        </div>
+
+    </div>
+
 </div>
 
 @code {
     private string? m_CurrentUrl;
 
+    private ServiceEmblem m_Emblem = ServiceEmblem.None;
+    private string? m_EmblemPath;
+
     protected override void OnInitialized()
     {
         m_CurrentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            var record = await Db.UserEmblems.FindAsync(userId);
+            m_Emblem = record?.Emblem ?? ServiceEmblem.None;
+            m_EmblemPath = m_Emblem.ToImagePath();
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -116,4 +147,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-
