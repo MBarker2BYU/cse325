@@ -42,7 +42,7 @@
         <AuthorizeView Roles="@($"{Roles.User},{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")">
             <Authorized>
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link sp-nav-link" href="opportunities" Match="NavLinkMatch.Prefix">
+                    <NavLink class="nav-link sp-nav-link" href="opportunities/manage" Match="NavLinkMatch.Prefix">
                         <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span>
                         <span class="ms-2">Opportunities</span>
                     </NavLink>
