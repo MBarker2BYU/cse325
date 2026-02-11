@@ -1,0 +1,177 @@
+﻿@page "/Account/Manage/Emblem"
+@rendermode InteractiveServer
+
+@using ServePoint.Cadet.Data
+@using ServePoint.Cadet.Extensions
+@using Microsoft.AspNetCore.Authorization
+@using ServePoint.Cadet.Models.Entities
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Manage your account - Emblem</PageTitle>
+
+<h3 class="hud-title">Emblem</h3>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+    <div class="alert alert-info">@_statusMessage</div>
+}
+
+<div class="sp-panel">
+    <div class="sp-panel-header">
+        <span class="hud-title">Choose your service emblem</span>
+    </div>
+
+    <div class="sp-panel-body">
+        <div class="d-flex flex-column gap-3">
+
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:150px;height:150px;display:flex;align-items:center;justify-content:center;border:1px solid var(--hud-border);border-radius:12px;background:rgba(0,0,0,.12);">
+                    @if (!string.IsNullOrWhiteSpace(_previewPath))
+                    {
+                        <img @key="_previewPath"
+                             src="@_previewPath"
+                             alt="@_selected.ToDisplay()"
+                             style="width:150px;height:150px;object-fit:contain;" />
+                    }
+                    else
+                    {
+                        <span class="text-muted" style="font-family:var(--mono);font-size:.85rem;">None</span>
+                    }
+                </div>
+
+                <div class="flex-grow-1">
+                    <label class="form-label" style="font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;">
+                        Service emblem
+                    </label>
+
+                    <select class="form-select"
+                            value="@_selected"
+                            @onchange="OnSelectedChanged">
+                        @foreach (var opt in _options)
+                        {
+                            <option value="@opt">@opt.ToDisplay()</option>
+                        }
+                    </select>
+
+                    <div class="text-muted mt-2" style="font-size:.85rem;">
+                        This emblem is shown on your sidebar user card.
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                    @(_saving ? "Saving..." : "Save")
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary" @onclick="ReloadAsync" disabled="@_saving">
+                    Reload
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? _statusMessage;
+    private bool _saving;
+
+    private ServiceEmblem _selected = ServiceEmblem.None;
+    private string? _previewPath;
+
+    private readonly ServiceEmblem[] _options = new[]
+    {
+        ServiceEmblem.None,
+        ServiceEmblem.USA,
+        ServiceEmblem.USN,
+        ServiceEmblem.USMC,
+        ServiceEmblem.USAF,
+        ServiceEmblem.USSF,
+        ServiceEmblem.USCG
+    };
+
+    protected override async Task OnInitializedAsync()
+        => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _statusMessage = null;
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            _statusMessage = "Unable to determine your user id.";
+            _selected = ServiceEmblem.None;
+            _previewPath = _selected.ToImagePath();
+            return;
+        }
+
+        var record = await Db.UserEmblems.FindAsync(userId);
+        _selected = record?.Emblem ?? ServiceEmblem.None;
+        _previewPath = _selected.ToImagePath();
+    }
+
+    private void OnSelectedChanged(ChangeEventArgs e)
+    {
+        // Parse enum from the <option value="...">
+        if (Enum.TryParse<ServiceEmblem>(e.Value?.ToString(), out var parsed))
+            _selected = parsed;
+        else
+            _selected = ServiceEmblem.None;
+
+        _previewPath = _selected.ToImagePath();
+        StateHasChanged();
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _statusMessage = null;
+
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                _statusMessage = "Unable to determine your user id.";
+                return;
+            }
+
+            var record = await Db.UserEmblems.FindAsync(userId);
+            if (record is null)
+            {
+                record = new UserEmblem { UserId = userId, Emblem = _selected };
+                Db.UserEmblems.Add(record);
+            }
+            else
+            {
+                record.Emblem = _selected;
+            }
+
+            await Db.SaveChangesAsync();
+
+            _previewPath = _selected.ToImagePath();
+            _statusMessage = "Saved.";
+        }
+        catch
+        {
+            _statusMessage = "Error saving emblem.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+        => await LoadAsync();
+}
