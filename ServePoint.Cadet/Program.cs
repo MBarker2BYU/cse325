@@ -28,8 +28,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     if (builder.Environment.IsDevelopment())
         options.UseSqlite(connectionString);
     else
-        options.UseNpgsql(connectionString);
+        options.UseNpgsql(connectionString, npgsql =>
+            npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
 });
+
 
 // Identity (ONE TIME)
 builder.Services

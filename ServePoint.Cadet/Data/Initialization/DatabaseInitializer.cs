@@ -33,6 +33,12 @@ public static class DatabaseInitializer
         try
         {
             await db.Database.MigrateAsync();
+
+            if (!db.Database.IsSqlite())
+            {
+                // If this fails, your migrations were not applied (or wrong DB)
+                await db.Database.ExecuteSqlRawAsync("SELECT 1 FROM \"AspNetRoles\" LIMIT 1");
+            }
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("PendingModelChangesWarning"))
         {
