@@ -13,6 +13,7 @@
 // ***********************************************************************
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ServePoint.Cadet.Data.Initialization;
 
@@ -22,7 +23,15 @@ public static class DatabaseInitializer
     public static async Task EnsureHealthyAsync(IServiceProvider services, IHostEnvironment env)
     {
         using var scope = services.CreateScope();
+
+        var logger = scope.ServiceProvider
+            .GetRequiredService<ILogger<DatabaseInitializer>>();
+
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        logger.LogInformation("DB Provider: {Provider}", db.Database.ProviderName);
+        logger.LogInformation("DB Connection: {DataSource}", db.Database.GetDbConnection().DataSource);
+
 
         if (db.Database.IsSqlite())
         {
