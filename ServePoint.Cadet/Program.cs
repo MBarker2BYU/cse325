@@ -84,7 +84,13 @@ using (var scope = app.Services.CreateScope())
         accessCmd.CommandText = "CREATE TABLE IF NOT EXISTS __ddl_test(id int); DROP TABLE __ddl_test;";
         await cmd.ExecuteNonQueryAsync();
         Console.WriteLine("DDL OK");
-        
+
+        var pending = await db.Database.GetPendingMigrationsAsync();
+        Console.WriteLine("Pending migrations: " + string.Join(", ", pending));
+
+        await db.Database.MigrateAsync();
+        Console.WriteLine("MigrateAsync completed.");
+
         await conn.CloseAsync();
     }
     catch (Exception ex)
