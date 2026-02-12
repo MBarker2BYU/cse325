@@ -80,6 +80,11 @@ using (var scope = app.Services.CreateScope())
         var result = await cmd.ExecuteScalarAsync();
         Console.WriteLine($"Preflight OK: {result}");
 
+        await using var accessCmd = conn.CreateCommand();
+        accessCmd.CommandText = "CREATE TABLE IF NOT EXISTS __ddl_test(id int); DROP TABLE __ddl_test;";
+        await cmd.ExecuteNonQueryAsync();
+        Console.WriteLine("DDL OK");
+        
         await conn.CloseAsync();
     }
     catch (Exception ex)
