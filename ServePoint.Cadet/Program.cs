@@ -75,6 +75,6 @@ app.MapRazorComponents<App>()
 
 app.MapAdditionalIdentityEndpoints();
 
-await DatabaseInitializer.EnsureHealthyAsync(app.Services);
+await DatabaseInitializer.EnsureHealthyAsync(app.Services, app.Environment);
 
 app.Run();
