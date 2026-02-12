@@ -77,6 +77,14 @@ app.MapRazorComponents<App>()
 
 app.MapAdditionalIdentityEndpoints();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    Console.WriteLine(db.Database.ProviderName);
+    Console.WriteLine(db.Database.GetDbConnection().ConnectionString);
+}
+
+
 await DatabaseInitializer.EnsureHealthyAsync(app.Services, app.Environment);
 
 app.Run();
