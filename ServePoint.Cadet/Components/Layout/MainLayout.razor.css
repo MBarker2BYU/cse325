@@ -96,3 +96,120 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+@media (max-width: 640.98px) {
+
+    .page {
+        display: block; /* stop stacking sidebar above main */
+    }
+
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0; /* top:0; bottom:0; left:0 */
+        width: 320px; /* pick your mobile width */
+        max-width: 90vw;
+        z-index: 2000;
+        /* start hidden off-canvas */
+        transform: translateX(-100%);
+        transition: transform 200ms ease;
+    }
+
+        /* When the menu is opened, slide the whole sidebar in */
+        .sidebar:has(.navbar-toggler:checked) {
+            transform: translateX(0);
+        }
+
+    /* main content should be full width and start at top */
+    main {
+        width: 100%;
+    }
+}
+
+/* ===== MOBILE NAV OVERLAY (keeps content at top + keeps hamburger visible) ===== */
+@media (max-width: 640.98px) {
+
+    .page {
+        position: relative;
+        display: block; /* stop sidebar stacking above main */
+        min-height: 100vh;
+    }
+
+    /* hide the checkbox itself */
+    .sp-nav-toggle {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+
+    /* hamburger button (visible always) */
+    .sp-hamburger {
+        position: fixed;
+        top: .5rem;
+        right: 1rem;
+        width: 3.5rem;
+        height: 2.5rem;
+        z-index: 3001;
+        cursor: pointer;
+        border-radius: .5rem;
+    }
+
+        /* draw the 3 lines */
+        .sp-hamburger::before,
+        .sp-hamburger::after {
+            content: "";
+            position: absolute;
+            left: .85rem;
+            right: .85rem;
+            height: 2px;
+            background: rgba(255,255,255,.85);
+            border-radius: 2px;
+        }
+
+        .sp-hamburger::before {
+            top: .8rem;
+            box-shadow: 0 .45rem 0 rgba(255,255,255,.85);
+        }
+
+        .sp-hamburger::after {
+            top: 1.7rem;
+        }
+
+    /* sidebar becomes off-canvas */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 320px;
+        max-width: 90vw;
+        z-index: 3000;
+        transform: translateX(-100%);
+        transition: transform 200ms ease;
+    }
+
+    /* backdrop */
+    .sp-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 2999;
+    }
+
+    /* open state */
+    .sp-nav-toggle:checked ~ .sidebar {
+        transform: translateX(0);
+    }
+
+    .sp-nav-toggle:checked ~ .sp-backdrop {
+        display: block;
+        background: rgba(0,0,0,.45);
+    }
+
+    main {
+        width: 100%;
+    }
+}

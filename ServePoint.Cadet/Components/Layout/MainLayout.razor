@@ -1,10 +1,19 @@
 ﻿@inherits LayoutComponentBase
 
 <div class="page">
+    <!-- Global mobile nav toggle -->
+    <input type="checkbox" id="sp-nav-toggle" class="sp-nav-toggle" />
+
+    <!-- Hamburger button -->
+    <label for="sp-nav-toggle" class="sp-hamburger" aria-label="Open navigation"></label>
+
+    <!-- optional backdrop click to close -->
+    <label for="sp-nav-toggle" class="sp-backdrop" aria-hidden="true"></label>
+
     <div class="sidebar">
         <NavMenu />
     </div>
-    
+
     <main>
         <article class="content px-4">
             @Body

@@ -1,20 +1,9 @@
-.navbar-toggler {
-    appearance: none;
-    cursor: pointer;
-    width: 3.5rem;
-    height: 2.5rem;
-    position: absolute;
-    top: 0.5rem;
-    right: 1rem;
-    /* no colors here */
-    border: 1px solid transparent;
-    background: none;
-}
+/* NavMenu.razor.css
+   NOTE: Mobile hamburger / overlay is now controlled by MainLayout (sp-nav-toggle).
+   This file ONLY styles the contents inside the sidebar.
+*/
 
-    .navbar-toggler:checked {
-        /* no colors here */
-    }
-
+/* ===== Top bar inside the menu ===== */
 .top-row {
     min-height: 3.5rem;
 }
@@ -23,7 +12,7 @@
     font-size: 1.1rem;
 }
 
-/* icons sizing only */
+/* ===== Icons sizing only ===== */
 .bi {
     display: inline-block;
     position: relative;
@@ -67,6 +56,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-arrow-bar-left' viewBox='0 0 16 16'%3E%3Cpath d='M12.5 15a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 1 0v13a.5.5 0 0 1-.5.5ZM10 8a.5.5 0 0 1-.5.5H3.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L3.707 7.5H9.5a.5.5 0 0 1 .5.5Z'/%3E%3C/svg%3E");
 }
 
+/* ===== Menu items ===== */
 .nav-item {
     font-size: 0.9rem;
     padding-bottom: 0.5rem;
@@ -92,79 +82,42 @@
         width: 100%;
     }
 
-.nav-scrollable {
-    display: none;
-}
-
-.navbar-toggler:checked ~ .nav-scrollable {
-    display: block;
-}
-
-/* Sidebar must be a flex column for footer push-down to work */
-.sidebar {
+/* ===== Shell + scrolling + footer pinning =====
+   The sidebar overlay/positioning is handled by MainLayout.
+   This file only makes the inside of the menu behave (scroll + bottom footer).
+*/
+.sp-navshell {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden; /* so only nav-scrollable scrolls */
+    height: 100%;
+    overflow: hidden; /* so only the scroll area scrolls */
 }
 
-
-/* Let the nav area take remaining space and scroll */
+/* Let the scrolling area take the remaining space */
 .nav-scrollable {
+    display: block; /* IMPORTANT: no longer hidden by a checkbox */
     flex: 1 1 auto;
     overflow-y: auto;
+    min-height: 0; /* IMPORTANT for flex scroll */
 }
 
-/* Footer pinned */
+    /* Make the nav area a vertical flex column so footer can push down */
+    .nav-scrollable > .sp-navscroll > nav.nav {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+/* Footer pinned to bottom of sidebar */
 .sp-sidebar-footer {
-    flex: 0 0 auto;
     margin-top: auto;
+    flex: 0 0 auto;
     padding: .75rem .75rem;
     border-top: 1px solid rgba(120, 255, 225, 0.14);
 }
 
-
+/* Desktop: keep footer visible while scrolling (optional) */
 @media (min-width: 641px) {
-    .navbar-toggler {
-        display: none;
-    }
-
-    .nav-scrollable {
-        display: block;
-        height: auto; /* IMPORTANT: stop forcing full height */
-        flex: 1 1 auto; /* take remaining sidebar space */
-        overflow-y: auto; /* scrolling stays ONLY here */
-        min-height: 0; /* IMPORTANT for flexbox scrolling */
-    }
-}
-
-/* ===============================
-   Sidebar layout: footer pinned
-   =============================== */
-
-/* Make the nav area a vertical flex column */
-.nav-scrollable > nav.nav {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 3.5rem); /* matches existing desktop calc */
-}
-
-/* Push footer to the bottom */
-.sp-sidebar-footer {
-    margin-top: auto;
-    flex: 0 0 auto;
-    padding: .75rem 0;
-    border-top: 1px solid rgba(120, 255, 225, 0.14);
-}
-
-/* Keep the scrolling behavior for the menu list, not the footer */
-@media (min-width: 641px) {
-    .nav-scrollable {
-        height: calc(100vh - 3.5rem);
-        overflow-y: auto;
-    }
-
-    /* ensure footer stays visible even when nav-scrollable scrolls */
     .sp-sidebar-footer {
         position: sticky;
         bottom: 0;
