@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ServePoint.Cadet.Components;
@@ -10,99 +10,83 @@ using System.Data.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Razor / Blazor
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Identity (Blazor)
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
-// Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     if (builder.Environment.IsDevelopment())
         options.UseSqlite(connectionString);
     else
-        options.UseNpgsql(connectionString, npgsql =>
-            npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+        options.UseNpgsql(connectionString); // o NOT override migrations assembly
 });
 
-
-// Identity (ONE TIME)
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = true;
+        options.SignIn.RequireConfirmedAccount = true; // consider false for testing
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-// Email (noop)
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-//Services
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<OpportunityManagementService>();
 builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 
-// --- DB PREFLIGHT (provider-aware) ---
-using (var scope = app.Services.CreateScope())
+//
+// --- DB PREFLIGHT (safe) ---
+//
+try
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    // Detect provider without running migrations
-    var provider = db.Database.ProviderName ?? "(unknown)";
-    Console.WriteLine($"DB Provider: {provider}");
+    Console.WriteLine($"DB Provider: {db.Database.ProviderName}");
+    await using DbConnection conn = db.Database.GetDbConnection();
+    Console.WriteLine($"DB DataSource: {conn.DataSource}");
 
-    try
+    await conn.OpenAsync();
+
+    // Basic query proves connectivity
+    await using (var cmd = conn.CreateCommand())
     {
-        // This is ADO.NET-level connectivity (EF isn't doing any schema work here)
-        await using DbConnection conn = db.Database.GetDbConnection();
-        Console.WriteLine($"DB Connection (DataSource): {conn.DataSource}");
-
-        await conn.OpenAsync();
-
-        // Tiny query to prove the connection works
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = db.Database.IsSqlite()
-            ? "SELECT sqlite_version();"
-            : "SELECT version();";   // Postgres / SQL Server etc. can handle version()-like queries; Postgres definitely can
-
+        cmd.CommandText = db.Database.IsSqlite() ? "SELECT sqlite_version();" : "SELECT version();";
         var result = await cmd.ExecuteScalarAsync();
         Console.WriteLine($"Preflight OK: {result}");
-
-        await using var accessCmd = conn.CreateCommand();
-        accessCmd.CommandText = "CREATE TABLE IF NOT EXISTS __ddl_test(id int); DROP TABLE __ddl_test;";
-        await cmd.ExecuteNonQueryAsync();
-        Console.WriteLine("DDL OK");
-
-        var pending = await db.Database.GetPendingMigrationsAsync();
-        Console.WriteLine("Pending migrations: " + string.Join(", ", pending));
-
-        await db.Database.MigrateAsync();
-        Console.WriteLine("MigrateAsync completed.");
-
-        await conn.CloseAsync();
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine("Preflight FAILED:");
-        Console.WriteLine(ex.ToString());
-        Environment.Exit(1); // fail fast so Render shows the real reason
-    }
+
+    // Show pending migrations (proves EF can see them)
+    var pending = await db.Database.GetPendingMigrationsAsync();
+    Console.WriteLine("Pending migrations: " + string.Join(", ", pending));
+
+    // Apply migrations (creates AspNetRoles etc.)
+    await db.Database.MigrateAsync();
+    Console.WriteLine("MigrateAsync completed.");
+
+    await conn.CloseAsync();
+}
+catch (Exception ex)
+{
+    Console.WriteLine("Preflight FAILED:");
+    Console.WriteLine(ex);
+    Environment.Exit(1);
 }
 // --- end preflight ---
 
-// Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -117,20 +101,11 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 
-// Routing
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAdditionalIdentityEndpoints();
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    Console.WriteLine(db.Database.ProviderName);
-    Console.WriteLine(db.Database.GetDbConnection().ConnectionString);
-}
-
 
 await DatabaseInitializer.EnsureHealthyAsync(app.Services, app.Environment);
 

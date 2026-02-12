@@ -11,7 +11,7 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260212230806_InitialCreate")]
+    [Migration("20260212233440_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
