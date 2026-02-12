@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using ServePoint.Cadet.Auth;
 using ServePoint.Cadet.Components;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Initialization;
 using ServePoint.Cadet.Data.Services;
-using ServePoint.Cadet.Models.Entities;
+using System.Data.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +53,43 @@ builder.Services.AddScoped<OpportunityManagementService>();
 builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
+
+// --- DB PREFLIGHT (provider-aware) ---
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    // Detect provider without running migrations
+    var provider = db.Database.ProviderName ?? "(unknown)";
+    Console.WriteLine($"DB Provider: {provider}");
+
+    try
+    {
+        // This is ADO.NET-level connectivity (EF isn't doing any schema work here)
+        await using DbConnection conn = db.Database.GetDbConnection();
+        Console.WriteLine($"DB Connection (DataSource): {conn.DataSource}");
+
+        await conn.OpenAsync();
+
+        // Tiny query to prove the connection works
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = db.Database.IsSqlite()
+            ? "SELECT sqlite_version();"
+            : "SELECT version();";   // Postgres / SQL Server etc. can handle version()-like queries; Postgres definitely can
+
+        var result = await cmd.ExecuteScalarAsync();
+        Console.WriteLine($"Preflight OK: {result}");
+
+        await conn.CloseAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Preflight FAILED:");
+        Console.WriteLine(ex.ToString());
+        Environment.Exit(1); // fail fast so Render shows the real reason
+    }
+}
+// --- end preflight ---
 
 // Pipeline
 if (app.Environment.IsDevelopment())
