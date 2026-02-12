@@ -725,3 +725,19 @@ select,
 .sp-role-pill {
     background-color: rgba(0,92,255, .3) !important;
 }
+
+:root {
+    --sp-warning: #f6c343;
+}
+
+.text-danger,
+.validation-message,
+.validation-summary-errors {
+    color: var(--sp-warning) !important;
+}
+
+.is-invalid,
+input.input-validation-error {
+    border-color: var(--sp-warning) !important;
+    box-shadow: 0 0 8px rgba(246, 195, 67, 0.4) !important;
+}

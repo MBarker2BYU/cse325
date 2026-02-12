@@ -29,7 +29,7 @@ public class ApplicationUser : IdentityUser
             var middleInitial =
                 string.IsNullOrWhiteSpace(middle) ? "" : $" {char.ToUpperInvariant(middle[0])}.";
 
-            return $"{last.ToUpperInvariant()}, {first}{middleInitial}";
+            return $"{last}, {first}{middleInitial}";
         }
     }
 }

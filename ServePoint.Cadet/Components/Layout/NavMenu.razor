@@ -1,4 +1,5 @@
-﻿@using ServePoint.Cadet.Auth
+﻿@using Microsoft.AspNetCore.Identity
+@using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data
 @using ServePoint.Cadet.Extensions
 @implements IDisposable
@@ -6,6 +7,8 @@
 @inject NavigationManager NavigationManager
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -97,7 +100,9 @@
                         }
 
                         <div class="sp-usercard-service">@m_Emblem.ToDisplay()</div>
-                        <div class="sp-usercard-identity">@context.User.Identity?.Name</div>
+                        @* <div class="sp-usercard-identity">@context.User.Identity?.Name</div> *@
+                        <div class="sp-usercard-identity">@(!string.IsNullOrWhiteSpace(m_DisplayName) ? m_DisplayName : context.User.Identity?.Name)</div>
+
                     </div>
                 </a>
             </Authorized>
@@ -117,6 +122,8 @@
     private ServiceEmblem m_Emblem = ServiceEmblem.None;
     private string? m_EmblemPath;
 
+    private string? m_DisplayName;
+
     protected override void OnInitialized()
     {
         m_CurrentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
@@ -126,15 +133,18 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var user = await UserManager.GetUserAsync(auth.User);
 
-        if (!string.IsNullOrEmpty(userId))
+        if (user is not null)
         {
-            var record = await Db.UserEmblems.FindAsync(userId);
+            m_DisplayName = user.DisplayName;
+
+            var record = await Db.UserEmblems.FindAsync(user.Id);
             m_Emblem = record?.Emblem ?? ServiceEmblem.None;
             m_EmblemPath = m_Emblem.ToImagePath();
         }
     }
+
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
