@@ -39,7 +39,7 @@
                     }
                     else
                     {
-                        <span class="text-muted" style="font-family:var(--mono);font-size:.85rem;">None</span>
+                        <span class="hud-muted-text" style="font-family:var(--mono);font-size:.85rem;">None</span>
                     }
                 </div>
 
@@ -48,7 +48,7 @@
                         Service emblem
                     </label>
 
-                    <select class="form-select"
+                    <select class="form-select" aria-label="Select service emblem"
                             value="@_selected"
                             @onchange="OnSelectedChanged">
                         @foreach (var opt in _options)
@@ -57,7 +57,7 @@
                         }
                     </select>
 
-                    <div class="text-muted mt-2" style="font-size:.85rem;">
+                    <div class="hud-muted-text mt-2" style="font-size:.85rem;">
                         This emblem is shown on your sidebar user card.
                     </div>
                 </div>

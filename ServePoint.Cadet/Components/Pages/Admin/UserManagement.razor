@@ -107,14 +107,14 @@ else
                                             {
                                                 if (IsSuspended(r))
                                                 {
-                                                    <button class="btn btn-sm btn-outline-success"
+                                                    <button class="btn btn-sm btn-green-glass"
                                                             @onclick="() => Unsuspend(r.Id)">
                                                         Unsuspend
                                                     </button>
                                                 }
                                                 else
                                                 {
-                                                    <button class="btn btn-sm btn-outline-danger"
+                                                    <button class="btn btn-sm btn-red-glass"
                                                             @onclick="() => Suspend(r.Id)">
                                                         Suspend
                                                     </button>
@@ -148,20 +148,15 @@ else
                                                 }
                                             </select>
 
-                                            <button class="btn btn-sm btn-outline-danger"
+                                            <button class="btn btn-sm btn-red-glass"
                                                     disabled="@string.IsNullOrWhiteSpace(r.SelectedRoleToRemove)"
                                                     @onclick="() => RemoveRole(r.Id, r.SelectedRoleToRemove!)">
                                                 Remove
                                             </button>
                                         </div>
                                     </div>
-
-
                                 </div>
                             </td>
-
-
-
                         </tr>
                     }
                 </tbody>

@@ -221,7 +221,7 @@ else
                                 {
                                     if (!row.IsApproved)
                                     {
-                                        <button class="btn btn-sm btn-outline-success"
+                                        <button class="btn btn-sm btn-yellow-glass"
                                                 disabled="@m_Busy"
                                                 @onclick="() => ApproveAsync(row.Id)">
                                             Approve
@@ -229,7 +229,7 @@ else
                                     }
                                     else
                                     {
-                                        <button class="btn btn-sm btn-outline-warning"
+                                        <button class="btn btn-sm btn-yellow-glass"
                                                 disabled="@m_Busy"
                                                 @onclick="() => UnapproveAsync(row.Id)">
                                             Unapprove
@@ -237,14 +237,14 @@ else
                                     }
                                 }
 
-                                <button class="btn btn-sm btn-outline-primary ms-1"
+                                <button class="btn btn-sm btn-blue-glass ms-1"
                                         title="@(locked ? "Organizers can only edit/delete until the day before the event." : null)"
                                         @onclick="() => OpenEditorAsync(row.Id)"
                                         disabled="@(m_Busy || locked)">
                                     Edit
                                 </button>
 
-                                <button class="btn btn-sm btn-outline-danger ms-1"
+                                <button class="btn btn-sm btn-red-glass ms-1"
                                         title="@(locked ? "Organizers can only edit/delete until the day before the event." : null)"
                                         @onclick="() => ConfirmAndDeleteAsync(row.Id, row.Title)"
                                         disabled="@(m_Busy || locked)">

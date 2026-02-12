@@ -7,6 +7,7 @@ using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Initialization;
 using ServePoint.Cadet.Data.Services;
+using ServePoint.Cadet.Models.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 

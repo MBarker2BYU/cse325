@@ -68,6 +68,17 @@
     /* Bootstrap link vars (force HUD) */
     --bs-link-color: rgba(127,255,230,0.85);
     --bs-link-hover-color: rgba(127,255,230,1);
+    /*Glass Buttons*/
+    --glass-btn-text-color: 230, 241, 240;
+    --glass-btn-blue: 0, 123, 255;
+    --glass-btn-green: 34, 197, 94;
+    --glass-btn-red: 220, 53, 69;
+    --glass-btn-yellow: 255, 193, 7;
+    --glass-btn-fill-alpha: 0.35;
+    --glass-btn-border-alpha: 0.90;
+    --glass-btn-hvr-fill-alpha: 0.55;
+    --glass-btn-hvr-border-alpha: 1;
+    --muted-teal-white-green: 77, 191, 166;
 }
 
 /* ============================================================
@@ -740,4 +751,67 @@ select,
 input.input-validation-error {
     border-color: var(--sp-warning) !important;
     box-shadow: 0 0 8px rgba(246, 195, 67, 0.4) !important;
+}
+
+/*Glass Buttons*/
+
+.btn-blue-glass {
+    background-color: rgba(var(--glass-btn-blue), var(--glass-btn-fill-alpha)); /* 35% fill */
+    color: var(--glass-btn-text-color);
+    border: 1px solid rgba(var(--glass-btn-blue), var(--glass-btn-border-alpha)); /* 90% border */
+    font-weight: 600;
+}
+
+    .btn-blue-glass:hover,
+    .btn-blue-glass:focus {
+        background-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+        border-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-border-alpha)); /* full border */
+        color: var(--glass-btn-text-color);
+    }
+
+.btn-green-glass {
+    background-color: rgba(var(--glass-btn-green), var(--glass-btn-fill-alpha)); /* 35% fill */
+    color: var(--glass-btn-text-color);
+    border: 1px solid rgba(var(--glass-btn-green), var(--glass-btn-border-alpha)); /* 90% border */
+    font-weight: 600;
+}
+
+.btn-blue-glass:hover,
+.btn-blue-glass:focus {
+    background-color: rgba(var(--glass-btn-green), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+    border-color: rgba(var(--glass-btn-green), var(--glass-btn-hvr-border-alpha)); /* full border */
+    color: var(--glass-btn-text-color);
+}
+
+.btn-red-glass {
+    background-color: rgba(var(--glass-btn-red), var(--glass-btn-fill-alpha)); /* 35% fill */
+    color: var(--glass-btn-text-color);
+    border: 1px solid rgba(var(--glass-btn-red), var(--glass-btn-border-alpha)); /* 90% border */
+    font-weight: 600;
+}
+
+    .btn-red-glass:hover,
+    .btn-red-glass:focus {
+        background-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+        border-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-border-alpha)); /* full border */
+        color: var(--glass-btn-text-color);
+    }
+
+
+.btn-yellow-glass {
+    background-color: rgba(var(--glass-btn-yellow), var(--glass-btn-fill-alpha)); /* 35% fill */
+    color: var(--glass-btn-text-color);
+    border: 1px solid rgba(var(--glass-btn-yellow), var(--glass-btn-border-alpha)); /* 90% border */
+    font-weight: 600;
+}
+
+    .btn-yellow-glass:hover,
+    .btn-yellow-glass:focus {
+        background-color: rgba(var(--glass-btn-yellow), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+        border-color: rgba(var(--glass-btn-yellow), var(--glass-btn-hvr-border-alpha)); /* full border */
+        color: var(--glass-btn-text-color);
+    }
+
+.hud-muted-text {
+    color: var(--muted-teal-white-green);
 }
