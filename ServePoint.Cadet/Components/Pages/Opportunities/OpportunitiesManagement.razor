@@ -3,11 +3,11 @@
 
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.JSInterop
 @using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data.Services
 @using ServePoint.Cadet.Models.Opportunities
+@using System.Globalization
+
 
 @attribute [Authorize(Roles = $"{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")]
 
@@ -21,10 +21,10 @@
     <h1 class="mb-0">Opportunities Management</h1>
 
     <div class="d-flex gap-2">
-        <button class="btn btn-primary" @onclick="ToggleCreate" disabled="@(m_Busy)">
+        <button class="btn btn-primary" @onclick="ToggleCreate" disabled="@m_Busy">
             @(m_ShowCreate ? "Hide Create" : "Create New")
         </button>
-        <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@(m_Busy)">
+        <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@m_Busy">
             Refresh
         </button>
     </div>
@@ -62,6 +62,16 @@
                     </div>
 
                     <div class="col-lg-2">
+                        <label class="form-label">Start</label>
+                        <InputText class="form-control" type="time" @bind-Value="m_CreateStartTimeText" />
+                    </div>
+
+                    <div class="col-lg-2">
+                        <label class="form-label">End</label>
+                        <InputText class="form-control" type="time" @bind-Value="m_CreateEndTimeText" />
+                    </div>
+
+                    <div class="col-lg-1">
                         <label class="form-label">Hours</label>
                         <InputNumber class="form-control" @bind-Value="m_Create.Hours" />
                     </div>
@@ -115,10 +125,10 @@
                 </div>
 
                 <div class="mt-3 d-flex gap-2">
-                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                    <button class="btn btn-primary" type="submit" disabled="@m_Busy">
                         @(m_Busy ? "Saving..." : "Create")
                     </button>
-                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearCreate" disabled="@(m_Busy)">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearCreate" disabled="@m_Busy">
                         Clear
                     </button>
                 </div>
@@ -149,7 +159,7 @@ else
                 <thead class="table-light">
                     <tr>
                         <th style="width: 28%">Title</th>
-                        <th style="width: 12%">Date</th>
+                        <th style="width: 16%">Date/Time</th>
                         <th style="width: 8%">Hours</th>
                         <th style="width: 10%">Status</th>
                         <th style="width: 22%">Contact</th>
@@ -174,7 +184,11 @@ else
                                 }
                             </td>
 
-                            <td>@row.Date.ToShortDateString()</td>
+                            <td>
+                                <div>@row.Date.ToShortDateString()</div>
+                                <div class="text-muted small">@row.StartTime.ToString("HH:mm")–@row.EndTime.ToString("HH:mm")</div>
+                            </td>
+
                             <td>@row.Hours</td>
 
                             <td>
@@ -208,7 +222,7 @@ else
                                     if (!row.IsApproved)
                                     {
                                         <button class="btn btn-sm btn-outline-success"
-                                                disabled="@(m_Busy)"
+                                                disabled="@m_Busy"
                                                 @onclick="() => ApproveAsync(row.Id)">
                                             Approve
                                         </button>
@@ -216,7 +230,7 @@ else
                                     else
                                     {
                                         <button class="btn btn-sm btn-outline-warning"
-                                                disabled="@(m_Busy)"
+                                                disabled="@m_Busy"
                                                 @onclick="() => UnapproveAsync(row.Id)">
                                             Unapprove
                                         </button>
@@ -229,7 +243,7 @@ else
                                         disabled="@(m_Busy || locked)">
                                     Edit
                                 </button>
-                                
+
                                 <button class="btn btn-sm btn-outline-danger ms-1"
                                         title="@(locked ? "Organizers can only edit/delete until the day before the event." : null)"
                                         @onclick="() => ConfirmAndDeleteAsync(row.Id, row.Title)"
@@ -291,6 +305,16 @@ else
                         <InputDate class="form-control" @bind-Value="m_Edit.Date" />
                     </div>
 
+                    <div class="col-md-3">
+                        <label class="form-label">Start</label>
+                        <InputText class="form-control" type="time" @bind-Value="m_EditStartTimeText" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">End</label>
+                        <InputText class="form-control" type="time" @bind-Value="m_EditEndTimeText" />
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label">Hours</label>
                         <InputNumber class="form-control"
@@ -349,10 +373,10 @@ else
                 </div>
 
                 <div class="sp-panel-actions d-flex gap-2 mt-4">
-                    <button class="btn btn-primary" type="submit" disabled="@(m_Busy)">
+                    <button class="btn btn-primary" type="submit" disabled="@m_Busy">
                         @(m_Busy ? "Saving..." : "Save")
                     </button>
-                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseEditor" disabled="@(m_Busy)">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseEditor" disabled="@m_Busy">
                         Cancel
                     </button>
                 </div>
@@ -383,6 +407,12 @@ else
     private bool m_ShowEditor;
     private EditModel? m_Edit;
 
+    private string m_CreateStartTimeText = "08:00";
+    private string m_CreateEndTimeText = "09:00";
+
+    private string m_EditStartTimeText = "08:00";
+    private string m_EditEndTimeText = "09:00";
+
     protected override async Task OnInitializedAsync()
         => await Reload();
 
@@ -397,22 +427,32 @@ else
 
     private bool CanEditHours => m_Actor?.CanEditHours ?? false;
 
+    // NOTE: still keeps "organizer locked on event date" rule,
+    // but now also locks if event has ended (end time).
     private bool IsLocked(OpportunityManagementService.OpportunityRow row)
     {
-        if (row.Date.Date < DateTime.Today)
+        var end = row.Date.Date.Add(row.EndTime.ToTimeSpan());
+        if (row.EndTime <= row.StartTime)
+            end = end.AddDays(1);
+
+        if (end <= DateTime.Now)
             return true;
 
         var organizerOnly = (m_Actor?.IsOrganizer ?? false)
                             && !(m_Actor?.IsInstructor ?? false)
                             && !(m_Actor?.IsAdmin ?? false);
 
-        // Organizer-only: locked on the event date
         return organizerOnly && row.Date.Date == DateTime.Today;
     }
 
-
     private void ToggleCreate() => m_ShowCreate = !m_ShowCreate;
-    private void ClearCreate() => m_Create = new CreateModel();
+
+    private void ClearCreate()
+    {
+        m_Create = new CreateModel();
+        m_CreateStartTimeText = "08:00";
+        m_CreateEndTimeText = "09:00";
+    }
 
     private async Task Reload()
     {
@@ -443,6 +483,27 @@ else
         {
             if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
 
+            // Parse & apply times BEFORE calling the service
+            if (!TryParseTime(m_CreateStartTimeText, out var st))
+            {
+                m_Error = "Start time is invalid.";
+                return;
+            }
+            if (!TryParseTime(m_CreateEndTimeText, out var et))
+            {
+                m_Error = "End time is invalid.";
+                return;
+            }
+            // if (et <= st)
+            // {
+            //     m_Error = "End time must be after start time.";
+            //     return;
+            // }
+
+            m_Create.StartTime = st;
+            m_Create.EndTime = et;
+            m_Create.Date = m_Create.Date.Date;
+
             m_Busy = true;
             ClearMessages();
 
@@ -451,6 +512,8 @@ else
 
             m_Status = msg;
             m_Create = new CreateModel();
+            m_CreateStartTimeText = "08:00";
+            m_CreateEndTimeText = "09:00";
             m_ShowCreate = false;
 
             await Reload();
@@ -467,6 +530,10 @@ else
 
             var (ok, msg, model) = await Opps.GetEditModelAsync(id);
             if (!ok || model is null) { m_Error = msg; return; }
+
+            // Safe: use "model", not m_Edit
+            m_EditStartTimeText = model.StartTime.ToString("HH:mm");
+            m_EditEndTimeText = model.EndTime.ToString("HH:mm");
 
             m_Edit = model;
             m_ShowEditor = true;
@@ -486,6 +553,27 @@ else
         {
             if (m_Actor is null) { m_Error = "Unable to determine current user."; return; }
             if (m_Edit is null) return;
+
+            // Parse & apply times BEFORE calling the service
+            if (!TryParseTime(m_EditStartTimeText, out var st))
+            {
+                m_Error = "Start time is invalid.";
+                return;
+            }
+            if (!TryParseTime(m_EditEndTimeText, out var et))
+            {
+                m_Error = "End time is invalid.";
+                return;
+            }
+            // if (et <= st)
+            // {
+            //     m_Error = "End time must be after start time.";
+            //     return;
+            // }
+
+            m_Edit.StartTime = st;
+            m_Edit.EndTime = et;
+            m_Edit.Date = m_Edit.Date.Date;
 
             m_Busy = true;
             ClearMessages();
@@ -571,4 +659,37 @@ else
         m_Status = null;
         m_Error = null;
     }
+
+    private static bool TryParseTime(string? value, out TimeOnly t)
+    {
+        t = default;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        value = value.Trim();
+
+        // Accept both 24-hour and AM/PM formats (what your browser is giving you)
+        string[] formats =
+        {
+            "HH:mm", "H:mm",
+            "hh:mm tt", "h:mm tt",
+            "hh:mmtt", "h:mmtt",   // some browsers omit the space
+            "HH:mm:ss", "H:mm:ss",
+            "hh:mm:ss tt", "h:mm:ss tt"
+        };
+
+        // Try current culture first (handles "08:00 PM" in US locale)
+        if (TimeOnly.TryParseExact(value, formats, CultureInfo.CurrentCulture, DateTimeStyles.None, out t))
+            return true;
+
+        // Fallback
+        if (TimeOnly.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out t))
+            return true;
+
+        // Last resort parse
+        return TimeOnly.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out t)
+               || TimeOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out t);
+    }
+
 }

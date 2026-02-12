@@ -12,6 +12,10 @@ public abstract class CreateEditModelBase
 
     public DateTime Date { get; set; } = DateTime.Today;
 
+    public TimeOnly StartTime { get; set; }
+
+    public TimeOnly EndTime { get; set; }
+
     [Range(1, 24)]
     public int Hours { get; set; } = 1;
 

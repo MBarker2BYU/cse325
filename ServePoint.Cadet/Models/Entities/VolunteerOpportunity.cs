@@ -18,7 +18,11 @@ public class VolunteerOpportunity
     public string? Description { get; set; }
 
     public DateTime Date { get; set; }
+    
+    public TimeOnly StartTime { get; set; }  // e.g. 08:00
 
+    public TimeOnly EndTime { get; set; }    // e.g. 10:00
+    
     [MaxLength(200)]
     public string? Location { get; set; }
 

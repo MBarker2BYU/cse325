@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServePoint.Cadet.Data;
 
@@ -10,9 +11,11 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260211185308_AddOpportunityStartEndTimes")]
+    partial class AddOpportunityStartEndTimes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -164,22 +167,10 @@ namespace ServePoint.Cadet.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FirstName")
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastName")
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("MiddleName")
-                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedEmail")

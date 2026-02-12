@@ -8,6 +8,7 @@
 @using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data
 
+
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
@@ -28,6 +29,39 @@
             <h2>Create a new account.</h2>
             <hr />
             <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FirstName"
+                           id="Input.FirstName"
+                           class="form-control"
+                           autocomplete="given-name"
+                           aria-required="true"
+                           placeholder="First name" />
+                <label for="Input.FirstName">First name</label>
+                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.MiddleName"
+                           id="Input.MiddleName"
+                           class="form-control"
+                           autocomplete="additional-name"
+                           aria-required="false"
+                           placeholder="Middle name (optional)" />
+                <label for="Input.MiddleName">Middle name (optional)</label>
+                <ValidationMessage For="() => Input.MiddleName" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.LastName"
+                           id="Input.LastName"
+                           class="form-control"
+                           autocomplete="family-name"
+                           aria-required="true"
+                           placeholder="Last name" />
+                <label for="Input.LastName">Last name</label>
+                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+            </div>
+
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
                 <label for="Input.Email">Email</label>
@@ -75,10 +109,19 @@
     {
         var user = CreateUser();
 
+        user.FirstName = Input.FirstName.Trim();
+        user.LastName  = Input.LastName.Trim();
+        user.MiddleName = string.IsNullOrWhiteSpace(Input.MiddleName)
+            ? null
+            : Input.MiddleName.Trim();
+
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
         var result = await UserManager.CreateAsync(user, Input.Password);
+
 
         if (!result.Succeeded)
         {
@@ -136,6 +179,20 @@
 
     private sealed class InputModel
     {
+        [Required]
+        [MaxLength(50)]
+        [Display(Name = "First name")]
+        public string FirstName { get; set; } = "";
+
+        [MaxLength(50)]
+        [Display(Name = "Middle name (optional)")]
+        public string MiddleName { get; set; } = "";
+
+        [Required]
+        [MaxLength(50)]
+        [Display(Name = "Last name")]
+        public string LastName { get; set; } = "";
+
         [Required]
         [EmailAddress]
         [Display(Name = "Email")]

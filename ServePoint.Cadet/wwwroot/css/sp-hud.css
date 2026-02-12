@@ -721,3 +721,7 @@ select,
         width: min(320px, calc(100% - 1.5rem)) !important;
         margin: 0 auto !important; /* centered */
     }
+
+.sp-role-pill {
+    background-color: rgba(0,92,255, .3) !important;
+}
