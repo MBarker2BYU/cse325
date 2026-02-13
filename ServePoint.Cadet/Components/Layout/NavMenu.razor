@@ -9,6 +9,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
+@inject DbGateway Db
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -177,13 +178,19 @@
 
         m_DisplayName = user.DisplayName;
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var record = await db.UserEmblems
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == user.Id);
+        m_Emblem = await Db.ExecuteAsync(async db =>
+        {
+            var emblem = await db.UserEmblems
+                .AsNoTracking()
+                .Where(x => x.UserId == user.Id)
+                .Select(x => (ServiceEmblem?)x.Emblem)
+                .FirstOrDefaultAsync();
 
-        m_Emblem = record?.Emblem ?? ServiceEmblem.None;
+            return emblem ?? ServiceEmblem.None;
+        });
+
         m_EmblemPath = m_Emblem.ToImagePath();
+
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)

@@ -3,8 +3,11 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using ServePoint.Cadet.Data
+@using ServePoint.Cadet.Data.Services
 
+@inject DbGateway Db
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
@@ -67,7 +70,9 @@
                 <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
             </div>
 
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Save</button>
+            <button type="submit" class="w-100 btn btn-lg btn-primary" disabled="@m_Saving">
+                @(m_Saving ? "Saving..." : "Save")
+            </button>
         </EditForm>
     </div>
 </div>
@@ -76,6 +81,9 @@
     private ApplicationUser? m_User;
     private string? m_Username;
     private string? m_PhoneNumber;
+
+    private bool m_Loading;
+    private bool m_Saving;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -88,89 +96,116 @@
     {
         Input ??= new();
 
-        // One DB hit: get the current user
-        m_User = await UserManager.GetUserAsync(HttpContext.User);
-        if (m_User is null)
+        // Guard against double-execution/rerender concurrency
+        if (m_Loading) return;
+        m_Loading = true;
+
+        try
         {
-            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
-            return;
+            var userId = HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+                return;
+            }
+
+            // READ via DbGateway (fresh context, AsNoTracking)
+            var user = await Db.ExecuteAsync(async db =>
+            {
+                return await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == userId);
+            });
+
+            if (user is null)
+            {
+                RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+                return;
+            }
+
+            m_User = user;
+            m_Username = user.UserName;
+            m_PhoneNumber = user.PhoneNumber;
+
+            // Only prefill on initial GET; do NOT overwrite POSTed form values
+            if (!HttpMethods.IsPost(HttpContext.Request.Method))
+            {
+                Input.FirstName = user.FirstName ?? "";
+                Input.MiddleName = user.MiddleName ?? "";
+                Input.LastName = user.LastName ?? "";
+                Input.PhoneNumber = user.PhoneNumber;
+            }
         }
-
-        // Avoid extra store/DbContext calls: read from the user instance
-        m_Username = m_User.UserName;
-        m_PhoneNumber = m_User.PhoneNumber;
-
-        // Only prefill on initial GET; do NOT overwrite POSTed form values
-        if (!HttpMethods.IsPost(HttpContext.Request.Method))
+        finally
         {
-            Input.FirstName = m_User.FirstName ?? "";
-            Input.MiddleName = m_User.MiddleName ?? "";
-            Input.LastName = m_User.LastName ?? "";
-            Input.PhoneNumber = m_PhoneNumber;
+            m_Loading = false;
         }
     }
 
     private async Task OnValidSubmitAsync()
     {
-        // Re-fetch a fresh user instance for this POST.
-        // This avoids holding onto an entity that might be tied to an in-flight DbContext operation.
-        var user = await UserManager.GetUserAsync(HttpContext.User);
-        if (user is null)
+        if (m_Saving) return;
+        m_Saving = true;
+
+        try
         {
-            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
-            return;
-        }
-
-        // ---- Save name fields (First/Middle/Last) ----
-        var newFirst = Input.FirstName.Trim();
-        var newLast = Input.LastName.Trim();
-        var newMiddle = string.IsNullOrWhiteSpace(Input.MiddleName)
-            ? null
-            : Input.MiddleName.Trim();
-
-        var nameChanged =
-            !string.Equals(user.FirstName, newFirst, StringComparison.Ordinal) ||
-            !string.Equals(user.LastName, newLast, StringComparison.Ordinal) ||
-            !string.Equals(user.MiddleName, newMiddle, StringComparison.Ordinal);
-
-        if (nameChanged)
-        {
-            user.FirstName = newFirst;
-            user.LastName = newLast;
-            user.MiddleName = newMiddle;
-
-            var updateResult = await UserManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
+            // For writes, use UserManager (Identity rules + stamps + validation)
+            var user = await UserManager.GetUserAsync(HttpContext.User);
+            if (user is null)
             {
-                var msg = "Error: " + string.Join(", ", updateResult.Errors.Select(e => e.Description));
-                RedirectManager.RedirectToCurrentPageWithStatus(msg, HttpContext);
+                RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
                 return;
             }
-        }
 
-        // ---- Phone number logic ----
-        // Compare against current value from the freshly loaded user
-        var currentPhone = user.PhoneNumber;
+            var newFirst = Input.FirstName.Trim();
+            var newLast = Input.LastName.Trim();
+            var newMiddle = string.IsNullOrWhiteSpace(Input.MiddleName) ? null : Input.MiddleName.Trim();
 
-        if (!string.Equals(Input.PhoneNumber, currentPhone, StringComparison.Ordinal))
-        {
-            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
-            if (!setPhoneResult.Succeeded)
+            var nameChanged =
+                !string.Equals(user.FirstName, newFirst, StringComparison.Ordinal) ||
+                !string.Equals(user.LastName, newLast, StringComparison.Ordinal) ||
+                !string.Equals(user.MiddleName, newMiddle, StringComparison.Ordinal);
+
+            if (nameChanged)
             {
-                var msg = "Error: " + string.Join(", ", setPhoneResult.Errors.Select(e => e.Description));
-                RedirectManager.RedirectToCurrentPageWithStatus(msg, HttpContext);
-                return;
+                user.FirstName = newFirst;
+                user.LastName = newLast;
+                user.MiddleName = newMiddle;
+
+                var updateResult = await UserManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    var msg = "Error: " + string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                    RedirectManager.RedirectToCurrentPageWithStatus(msg, HttpContext);
+                    return;
+                }
             }
+
+            var currentPhone = user.PhoneNumber;
+            if (!string.Equals(Input.PhoneNumber, currentPhone, StringComparison.Ordinal))
+            {
+                var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
+                if (!setPhoneResult.Succeeded)
+                {
+                    var msg = "Error: " + string.Join(", ", setPhoneResult.Errors.Select(e => e.Description));
+                    RedirectManager.RedirectToCurrentPageWithStatus(msg, HttpContext);
+                    return;
+                }
+            }
+
+            await SignInManager.RefreshSignInAsync(user);
+
+            // Refresh the local UI fields (no additional Identity reads)
+            m_User = user;
+            m_Username = user.UserName;
+            m_PhoneNumber = user.PhoneNumber;
+
+            RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
         }
-
-        await SignInManager.RefreshSignInAsync(user);
-
-        // Keep local fields in sync (nice for immediate UI render)
-        m_User = user;
-        m_Username = user.UserName;
-        m_PhoneNumber = user.PhoneNumber;
-
-        RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
+        finally
+        {
+            m_Saving = false;
+        }
     }
 
     private sealed class InputModel

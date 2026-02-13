@@ -19,6 +19,7 @@ namespace ServePoint.Cadet.Data.Initialization;
 
 /// <summary>
 /// Ensures all application roles exist (idempotent).
+/// Safe for repeated execution.
 /// </summary>
 public static class InitializeRoles
 {
@@ -26,17 +27,28 @@ public static class InitializeRoles
     {
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-        foreach (var role in Roles.All)
+        foreach (var roleName in Roles.All)
         {
-            if (await roleManager.RoleExistsAsync(role))
+            var normalized = roleManager.NormalizeKey(roleName);
+
+            var exists = await roleManager.RoleExistsAsync(roleName);
+            if (exists)
                 continue;
 
-            var result = await roleManager.CreateAsync(new IdentityRole(role));
+            var role = new IdentityRole
+            {
+                Name = roleName,
+                NormalizedName = normalized
+            };
+
+            var result = await roleManager.CreateAsync(role);
+
             if (!result.Succeeded)
             {
+                var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+
                 throw new InvalidOperationException(
-                    $"Failed to create role '{role}': " +
-                    string.Join("; ", result.Errors.Select(e => e.Description)));
+                    $"Failed to create role '{roleName}'. Errors: {errors}");
             }
         }
     }

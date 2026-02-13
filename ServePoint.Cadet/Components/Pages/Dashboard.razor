@@ -14,7 +14,7 @@
 @inject OpportunityManagementService OpportunityService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IConfiguration Config
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -521,7 +521,7 @@ else
 
     private async Task ConfirmWithdraw(int signupId)
     {
-        var ok = await JS.InvokeAsync<bool>("confirm", "Withdraw from this opportunity?");
+        var ok = await Js.InvokeAsync<bool>("confirm", "Withdraw from this opportunity?");
         if (!ok) return;
 
         await Withdraw(signupId);

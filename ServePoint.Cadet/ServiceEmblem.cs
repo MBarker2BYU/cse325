@@ -26,25 +26,25 @@ public enum ServiceEmblem
     /// <summary>
     /// The usa
     /// </summary>
-    USA,   // Army
+    Usa,   // Army
     /// <summary>
     /// The usn
     /// </summary>
-    USN,   // Navy
+    Usn,   // Navy
     /// <summary>
     /// The usmc
     /// </summary>
-    USMC,  // Marine Corps
+    Usmc,  // Marine Corps
     /// <summary>
     /// The usaf
     /// </summary>
-    USAF,  // Air Force
+    Usaf,  // Air Force
     /// <summary>
     /// The ussf
     /// </summary>
-    USSF,  // Space Force
+    Ussf,  // Space Force
     /// <summary>
     /// The uscg
     /// </summary>
-    USCG   // Coast Guard
+    Uscg   // Coast Guard
 }

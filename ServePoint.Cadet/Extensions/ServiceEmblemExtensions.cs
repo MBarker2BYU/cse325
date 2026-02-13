@@ -40,17 +40,17 @@ public static class ServiceEmblemExtensions
         {
             switch (serviceEmblem)
             {
-                case ServiceEmblem.USA:
+                case ServiceEmblem.Usa:
                     return "U.S. Army";
-                case ServiceEmblem.USN:
+                case ServiceEmblem.Usn:
                     return "U.S. Navy";
-                case ServiceEmblem.USMC:
+                case ServiceEmblem.Usmc:
                     return "U.S. Marine Corps";
-                case ServiceEmblem.USAF:
+                case ServiceEmblem.Usaf:
                     return "U.S. Air Force";
-                case ServiceEmblem.USSF:
+                case ServiceEmblem.Ussf:
                     return "U.S. Space Force";
-                case ServiceEmblem.USCG:
+                case ServiceEmblem.Uscg:
                     return "U.S. Coast Guard";
                 case ServiceEmblem.None:
                 default:

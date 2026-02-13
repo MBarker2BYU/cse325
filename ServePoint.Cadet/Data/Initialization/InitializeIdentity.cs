@@ -19,6 +19,7 @@ namespace ServePoint.Cadet.Data.Initialization;
 
 /// <summary>
 /// Seeds the protected (built-in) admin account and ensures it has Admin role.
+/// Idempotent and safe for repeated startup runs.
 /// </summary>
 public static class InitializeIdentity
 {
@@ -29,10 +30,11 @@ public static class InitializeIdentity
 
         var adminEmail = AdminSentinel.GetProtectedAdminEmail(config);
 
-        // Keep compatibility with your existing config key
+        // Required for first-time creation only. For existing admin, we do NOT reset password.
         var adminPassword = config["DefaultAdmin:Password"]
                             ?? throw new InvalidOperationException("Missing DefaultAdmin:Password");
 
+        // Prefer lookup by normalized email. FindByEmailAsync does the right thing.
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
         if (adminUser is null)
@@ -75,6 +77,8 @@ public static class InitializeIdentity
                 changed = true;
             }
 
+            // Important: if Identity uses the email as username for login, keep normalized fields consistent too.
+            // UserManager.UpdateAsync will normalize based on configured stores.
             if (changed)
             {
                 var update = await userManager.UpdateAsync(adminUser);
@@ -87,7 +91,7 @@ public static class InitializeIdentity
             }
         }
 
-        // Ensure Admin role membership
+        // Ensure Admin role membership (idempotent)
         if (!await userManager.IsInRoleAsync(adminUser, Roles.Admin))
         {
             var addRole = await userManager.AddToRoleAsync(adminUser, Roles.Admin);

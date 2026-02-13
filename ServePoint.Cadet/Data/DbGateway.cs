@@ -3,23 +3,16 @@ using System.Collections.Concurrent;
 
 namespace ServePoint.Cadet.Data;
 
-public sealed class DbGateway
+public sealed class DbGateway(IDbContextFactory<ApplicationDbContext> factory)
 {
-    private readonly IDbContextFactory<ApplicationDbContext> _factory;
-
     // Optional: stops double-fire loads per key (Blazor render + event, etc.)
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new();
-
-    public DbGateway(IDbContextFactory<ApplicationDbContext> factory)
-    {
-        _factory = factory;
-    }
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> m_Gates = new();
 
     public async Task<T> ExecuteAsync<T>(
         Func<ApplicationDbContext, Task<T>> work,
         CancellationToken ct = default)
     {
-        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var db = await factory.CreateDbContextAsync(ct);
         return await work(db);
     }
 
@@ -27,7 +20,7 @@ public sealed class DbGateway
         Func<ApplicationDbContext, Task> work,
         CancellationToken ct = default)
     {
-        await using var db = await _factory.CreateDbContextAsync(ct);
+        await using var db = await factory.CreateDbContextAsync(ct);
         await work(db);
     }
 
@@ -37,7 +30,7 @@ public sealed class DbGateway
         Func<ApplicationDbContext, Task<T>> work,
         CancellationToken ct = default)
     {
-        var gate = _gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
+        var gate = m_Gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try { return await ExecuteAsync(work, ct); }
         finally { gate.Release(); }
@@ -48,7 +41,7 @@ public sealed class DbGateway
         Func<ApplicationDbContext, Task> work,
         CancellationToken ct = default)
     {
-        var gate = _gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
+        var gate = m_Gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try { await ExecuteAsync(work, ct); }
         finally { gate.Release(); }

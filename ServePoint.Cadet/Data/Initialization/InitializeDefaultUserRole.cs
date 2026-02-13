@@ -14,11 +14,19 @@ public static class InitializeDefaultUserRole
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-        // Load users from store
-        var users = await userManager.Users.ToListAsync();
+        // Materialize users so the query is completed before we start role operations
+        // (prevents provider/DbContext concurrency weirdness)
+        var users = await userManager.Users
+            .AsNoTracking()
+            .Select(u => new { u.Id })
+            .ToListAsync();
 
-        foreach (var user in users)
+        foreach (var u in users)
         {
+            var user = await userManager.FindByIdAsync(u.Id);
+            if (user is null)
+                continue;
+
             var roles = await userManager.GetRolesAsync(user);
 
             // Skip staff accounts (they should never be auto-modified)

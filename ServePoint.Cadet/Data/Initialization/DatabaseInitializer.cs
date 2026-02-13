@@ -7,7 +7,7 @@ public static class DatabaseInitializer
 {
     public static async Task EnsureHealthyAsync(IServiceProvider root, IHostEnvironment env)
     {
-        // 1) Migrate database schema
+        // 1) Migrate database schema (single responsibility: schema only)
         await using (var scope = root.CreateAsyncScope())
         {
             var sp = scope.ServiceProvider;
@@ -19,22 +19,23 @@ public static class DatabaseInitializer
                 throw new InvalidOperationException("Database not reachable after migration.");
         }
 
-        // 2) Seed Identity (roles first, then admin)
+        // 2) Seed Identity (roles first, then protected admin)
         await using (var scope = root.CreateAsyncScope())
         {
             var sp = scope.ServiceProvider;
+
             await InitializeRoles.RunAsync(sp);
             await InitializeIdentity.RunAsync(sp);
         }
 
-        // 3) Seed application/domain data
+        // 3) Seed application/domain data (idempotent)
         await using (var scope = root.CreateAsyncScope())
         {
             var sp = scope.ServiceProvider;
             await InitializeServePoint.RunAsync(sp);
         }
 
-        // 4) Apply default role policy (if used)
+        // 4) Apply default role policy (idempotent)
         await using (var scope = root.CreateAsyncScope())
         {
             var sp = scope.ServiceProvider;

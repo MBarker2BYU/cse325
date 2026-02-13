@@ -1,11 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Models.Entities;
 using ServePoint.Cadet.Models.Opportunities;
 
 namespace ServePoint.Cadet.Data.Services;
 
-public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDbContext> dbFactory)
+public sealed class OpportunityManagementService(DbGateway dbg)
 {
     public sealed record ActorContext(
         string UserId,
@@ -59,16 +58,9 @@ public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDb
     private static DateTime NormalizeEventDateUtc(DateTime date)
         => DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
 
-    private static DateTime StartDateTime(DateTime dateUtcMidnight, TimeOnly start)
-    {
-        var dt = NormalizeEventDateUtc(dateUtcMidnight).Add(start.ToTimeSpan());
-        return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-    }
-
     private static DateTime EndDateTime(DateTime dateUtcMidnight, TimeOnly start, TimeOnly end)
     {
         var baseDate = NormalizeEventDateUtc(dateUtcMidnight);
-
         var endDt = baseDate.Add(end.ToTimeSpan());
 
         // Overnight: ends next day
@@ -90,28 +82,25 @@ public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDb
         return true;
     }
 
-    public async Task<List<OpportunityRow>> GetAllAsync(CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+    public Task<List<OpportunityRow>> GetAllAsync(CancellationToken ct = default)
+        => dbg.ExecuteAsync(async db =>
+        {
+            var items = await db.VolunteerOpportunities
+                .AsNoTracking()
+                .Include(o => o.Contact)
+                .ThenInclude(c => c.Address)
+                .OrderByDescending(o => o.Date)
+                .ToListAsync(ct);
 
-        var items = await db.VolunteerOpportunities
-            .AsNoTracking()
-            .Include(o => o.Contact)
-            .ThenInclude(c => c.Address)
-            .OrderByDescending(o => o.Date)
-            .ToListAsync(ct);
-
-        return items.Select(MapRow).ToList();
-    }
+            return items.Select(MapRow).ToList();
+        }, ct);
 
     public async Task<(bool ok, string message)> CreateAsync(CreateModel input, ActorContext actor, CancellationToken ct = default)
     {
         if (!actor.CanManage)
             return (false, "Not authorized.");
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        // Normalize to UTC midnight to satisfy Npgsql timestamptz rules
+        // Normalize to UTC midnight to satisfy Npgsql timestamp tz rules
         input.Date = NormalizeEventDateUtc(input.Date);
 
         if (!ValidateTimes(input.StartTime, input.EndTime, out var timeError))
@@ -119,309 +108,308 @@ public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDb
 
         var now = DateTime.UtcNow;
 
-        var contact = new Contact
+        var ok = await dbg.ExecuteAsync(async db =>
         {
-            Name = input.ContactName.Trim(),
-            Email = string.IsNullOrWhiteSpace(input.ContactEmail) ? null : input.ContactEmail.Trim(),
-            Phone = string.IsNullOrWhiteSpace(input.ContactPhone) ? null : input.ContactPhone.Trim(),
-            Address = new Address
+            var contact = new Contact
             {
-                Street1 = input.Street1.Trim(),
-                Street2 = string.IsNullOrWhiteSpace(input.Street2) ? null : input.Street2.Trim(),
-                City = input.City.Trim(),
-                State = input.State.Trim(),
-                PostalCode = input.PostalCode.Trim()
-            }
-        };
+                Name = input.ContactName.Trim(),
+                Email = string.IsNullOrWhiteSpace(input.ContactEmail) ? null : input.ContactEmail.Trim(),
+                Phone = string.IsNullOrWhiteSpace(input.ContactPhone) ? null : input.ContactPhone.Trim(),
+                Address = new Address
+                {
+                    Street1 = input.Street1.Trim(),
+                    Street2 = string.IsNullOrWhiteSpace(input.Street2) ? null : input.Street2.Trim(),
+                    City = input.City.Trim(),
+                    State = input.State.Trim(),
+                    PostalCode = input.PostalCode.Trim()
+                }
+            };
 
-        var entity = new VolunteerOpportunity
-        {
-            Title = input.Title.Trim(),
-            Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
+            var entity = new VolunteerOpportunity
+            {
+                Title = input.Title.Trim(),
+                Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
 
-            Date = input.Date, // already normalized UTC midnight
-            StartTime = input.StartTime,
-            EndTime = input.EndTime,
+                Date = input.Date, // already normalized UTC midnight
+                StartTime = input.StartTime,
+                EndTime = input.EndTime,
 
-            Hours = input.Hours,
+                Hours = input.Hours,
 
-            CreatedByUserId = actor.UserId,
-            CreatedAt = now,
+                CreatedByUserId = actor.UserId,
+                CreatedAt = now,
 
-            Contact = contact,
+                Contact = contact,
 
-            IsApproved = actor.AutoApprove,
-            ApprovedAt = actor.AutoApprove ? now : null,
-            ApprovedByUserId = actor.AutoApprove ? actor.UserId : null
-        };
+                IsApproved = actor.AutoApprove,
+                ApprovedAt = actor.AutoApprove ? now : null,
+                ApprovedByUserId = actor.AutoApprove ? actor.UserId : null
+            };
 
-        db.VolunteerOpportunities.Add(entity);
-        await db.SaveChangesAsync(ct);
+            db.VolunteerOpportunities.Add(entity);
+            await db.SaveChangesAsync(ct);
+            return true;
+        }, ct);
 
-        return (true, actor.AutoApprove
-            ? "Opportunity created and approved."
-            : "Opportunity created (pending approval).");
+        return ok
+            ? (true, actor.AutoApprove ? "Opportunity created and approved." : "Opportunity created (pending approval).")
+            : (false, "Failed to create opportunity.");
     }
 
-    public async Task<(bool ok, string message, EditModel? model)> GetEditModelAsync(int id, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var existing = await db.VolunteerOpportunities
-            .AsNoTracking()
-            .Include(o => o.Contact)
-            .ThenInclude(c => c.Address)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-
-        if (existing is null)
-            return (false, "Opportunity not found.", null);
-
-        var m = new EditModel
+    public Task<(bool ok, string message, EditModel? model)> GetEditModelAsync(int id, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message, EditModel? model)>(async db =>
         {
-            Id = existing.Id,
+            var existing = await db.VolunteerOpportunities
+                .AsNoTracking()
+                .Include(o => o.Contact)
+                .ThenInclude(c => c.Address)
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-            Title = existing.Title,
-            Description = existing.Description,
+            if (existing is null)
+                return (false, "Opportunity not found.", null);
 
-            Date = existing.Date,
-            StartTime = existing.StartTime,
-            EndTime = existing.EndTime,
+            var m = new EditModel
+            {
+                Id = existing.Id,
 
-            Hours = existing.Hours,
+                Title = existing.Title,
+                Description = existing.Description,
 
-            IsApproved = existing.IsApproved,
+                Date = existing.Date,
+                StartTime = existing.StartTime,
+                EndTime = existing.EndTime,
 
-            ContactId = existing.ContactId,
-            ContactName = existing.Contact?.Name ?? "",
-            ContactEmail = existing.Contact?.Email,
-            ContactPhone = existing.Contact?.Phone,
+                Hours = existing.Hours,
 
-            AddressId = existing.Contact?.AddressId,
-            Street1 = existing.Contact?.Address?.Street1 ?? "",
-            Street2 = existing.Contact?.Address?.Street2,
-            City = existing.Contact?.Address?.City ?? "",
-            State = string.IsNullOrWhiteSpace(existing.Contact?.Address?.State) ? "FL" : existing.Contact!.Address!.State,
-            PostalCode = existing.Contact?.Address?.PostalCode ?? ""
-        };
+                IsApproved = existing.IsApproved,
 
-        return (true, "OK", m);
-    }
+                ContactId = existing.ContactId,
+                ContactName = existing.Contact?.Name ?? "",
+                ContactEmail = existing.Contact?.Email,
+                ContactPhone = existing.Contact?.Phone,
+
+                AddressId = existing.Contact?.AddressId,
+                Street1 = existing.Contact?.Address?.Street1 ?? "",
+                Street2 = existing.Contact?.Address?.Street2,
+                City = existing.Contact?.Address?.City ?? "",
+                State = string.IsNullOrWhiteSpace(existing.Contact?.Address?.State) ? "FL" : existing.Contact!.Address!.State,
+                PostalCode = existing.Contact?.Address?.PostalCode ?? ""
+            };
+
+            return (true, "OK", m);
+        }, ct);
 
     public async Task<(bool ok, string message)> UpdateAsync(EditModel input, ActorContext actor, CancellationToken ct = default)
     {
         if (!actor.CanManage)
             return (false, "Not authorized.");
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        // Normalize to UTC midnight to satisfy Npgsql timestamptz rules
+        // Normalize to UTC midnight to satisfy Npgsql timestamp tz rules
         input.Date = NormalizeEventDateUtc(input.Date);
 
         if (!ValidateTimes(input.StartTime, input.EndTime, out var timeError))
             return (false, timeError!);
 
-        var existing = await db.VolunteerOpportunities
-            .Include(o => o.Contact)
-            .ThenInclude(c => c.Address)
-            .FirstOrDefaultAsync(o => o.Id == input.Id, ct);
-
-        if (existing is null)
-            return (false, "Opportunity not found.");
-
-        if (HasEnded(existing))
-            return (false, "This opportunity has already ended and can no longer be edited.");
-
-        var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
-        if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
-            return (false, "Organizers can only edit opportunities until the day before the event.");
-
-        existing.Title = input.Title.Trim();
-        existing.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
-
-        existing.Date = input.Date; // already normalized UTC midnight
-        existing.StartTime = input.StartTime;
-        existing.EndTime = input.EndTime;
-
-        if (actor.CanEditHours)
-            existing.Hours = input.Hours;
-
-        existing.Contact ??= new Contact();
-        existing.Contact.Name = input.ContactName.Trim();
-        existing.Contact.Email = string.IsNullOrWhiteSpace(input.ContactEmail) ? null : input.ContactEmail.Trim();
-        existing.Contact.Phone = string.IsNullOrWhiteSpace(input.ContactPhone) ? null : input.ContactPhone.Trim();
-
-        var hasAnyAddress =
-            !string.IsNullOrWhiteSpace(input.Street1) ||
-            !string.IsNullOrWhiteSpace(input.City) ||
-            !string.IsNullOrWhiteSpace(input.PostalCode);
-
-        if (!hasAnyAddress)
+        return await dbg.ExecuteAsync(async db =>
         {
-            existing.Contact.AddressId = null;
-            existing.Contact.Address = null;
-        }
-        else
-        {
-            existing.Contact.Address ??= new Address();
-            existing.Contact.Address.Street1 = input.Street1.Trim();
-            existing.Contact.Address.Street2 = string.IsNullOrWhiteSpace(input.Street2) ? null : input.Street2.Trim();
-            existing.Contact.Address.City = input.City.Trim();
-            existing.Contact.Address.State = input.State.Trim();
-            existing.Contact.Address.PostalCode = input.PostalCode.Trim();
-        }
+            var existing = await db.VolunteerOpportunities
+                .Include(o => o.Contact)
+                .ThenInclude(c => c.Address)
+                .FirstOrDefaultAsync(o => o.Id == input.Id, ct);
 
-        var now = DateTime.UtcNow;
-        if (actor.AutoApprove)
-        {
-            existing.IsApproved = true;
-            existing.ApprovedAt = now;
-            existing.ApprovedByUserId = actor.UserId;
-        }
-        else
-        {
-            existing.IsApproved = false;
-            existing.ApprovedAt = null;
-            existing.ApprovedByUserId = null;
-        }
+            if (existing is null)
+                return (false, "Opportunity not found.");
 
-        await db.SaveChangesAsync(ct);
+            if (HasEnded(existing))
+                return (false, "This opportunity has already ended and can no longer be edited.");
 
-        return (true, actor.AutoApprove
-            ? "Saved changes (approved)."
-            : "Saved changes (pending re-approval).");
+            var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
+            if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
+                return (false, "Organizers can only edit opportunities until the day before the event.");
+
+            existing.Title = input.Title.Trim();
+            existing.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
+
+            existing.Date = input.Date; // already normalized UTC midnight
+            existing.StartTime = input.StartTime;
+            existing.EndTime = input.EndTime;
+
+            if (actor.CanEditHours)
+                existing.Hours = input.Hours;
+
+            existing.Contact ??= new Contact();
+            existing.Contact.Name = input.ContactName.Trim();
+            existing.Contact.Email = string.IsNullOrWhiteSpace(input.ContactEmail) ? null : input.ContactEmail.Trim();
+            existing.Contact.Phone = string.IsNullOrWhiteSpace(input.ContactPhone) ? null : input.ContactPhone.Trim();
+
+            var hasAnyAddress =
+                !string.IsNullOrWhiteSpace(input.Street1) ||
+                !string.IsNullOrWhiteSpace(input.City) ||
+                !string.IsNullOrWhiteSpace(input.PostalCode);
+
+            if (!hasAnyAddress)
+            {
+                existing.Contact.AddressId = null;
+                existing.Contact.Address = null;
+            }
+            else
+            {
+                existing.Contact.Address ??= new Address();
+                existing.Contact.Address.Street1 = input.Street1.Trim();
+                existing.Contact.Address.Street2 = string.IsNullOrWhiteSpace(input.Street2) ? null : input.Street2.Trim();
+                existing.Contact.Address.City = input.City.Trim();
+                existing.Contact.Address.State = input.State.Trim();
+                existing.Contact.Address.PostalCode = input.PostalCode.Trim();
+            }
+
+            var now = DateTime.UtcNow;
+            if (actor.AutoApprove)
+            {
+                existing.IsApproved = true;
+                existing.ApprovedAt = now;
+                existing.ApprovedByUserId = actor.UserId;
+            }
+            else
+            {
+                existing.IsApproved = false;
+                existing.ApprovedAt = null;
+                existing.ApprovedByUserId = null;
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            return (true, actor.AutoApprove
+                ? "Saved changes (approved)."
+                : "Saved changes (pending re-approval).");
+        }, ct);
     }
 
-    public async Task<(bool ok, string message)> DeleteAsync(int id, ActorContext actor, CancellationToken ct = default)
-    {
-        if (!actor.CanManage)
-            return (false, "Not authorized.");
-
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var existing = await db.VolunteerOpportunities
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-
-        if (existing is null)
-            return (false, "Opportunity not found.");
-
-        if (HasEnded(existing))
-            return (false, "This opportunity has already ended and can no longer be deleted.");
-
-        var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
-        if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
-            return (false, "Organizers can only delete opportunities until the day before the event.");
-
-        if (organizerOnly)
+    public Task<(bool ok, string message)> DeleteAsync(int id, ActorContext actor, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
         {
-            if (existing.IsDeletionRequested)
-                return (true, "Deletion request already pending approval.");
+            if (!actor.CanManage)
+                return (false, "Not authorized.");
 
-            existing.IsDeletionRequested = true;
-            existing.DeletionRequestedAt = DateTime.UtcNow;
-            existing.DeletionRequestedByUserId = actor.UserId;
+            var existing = await db.VolunteerOpportunities
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (existing is null)
+                return (false, "Opportunity not found.");
+
+            if (HasEnded(existing))
+                return (false, "This opportunity has already ended and can no longer be deleted.");
+
+            var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
+            if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
+                return (false, "Organizers can only delete opportunities until the day before the event.");
+
+            if (organizerOnly)
+            {
+                if (existing.IsDeletionRequested)
+                    return (true, "Deletion request already pending approval.");
+
+                existing.IsDeletionRequested = true;
+                existing.DeletionRequestedAt = DateTime.UtcNow;
+                existing.DeletionRequestedByUserId = actor.UserId;
+
+                existing.IsApproved = false;
+                existing.ApprovedAt = null;
+                existing.ApprovedByUserId = null;
+
+                await db.SaveChangesAsync(ct);
+                return (true, "Deletion request submitted for approval.");
+            }
+
+            db.VolunteerOpportunities.Remove(existing);
+            await db.SaveChangesAsync(ct);
+            return (true, "Opportunity deleted.");
+        });
+
+    public Task<(bool ok, string message)> ApproveAsync(int id, ActorContext actor, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+        {
+            if (!actor.CanApprove)
+                return (false, "Not authorized.");
+
+            var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+            if (existing is null) return (false, "Opportunity not found.");
+
+            if (existing.IsApproved) return (true, "Already approved.");
+
+            existing.IsApproved = true;
+            existing.ApprovedAt = DateTime.UtcNow;
+            existing.ApprovedByUserId = actor.UserId;
+
+            await db.SaveChangesAsync(ct);
+            return (true, "Opportunity approved.");
+        });
+
+    public Task<(bool ok, string message)> UnapproveAsync(int id, ActorContext actor, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+        {
+            if (!actor.CanApprove)
+                return (false, "Not authorized.");
+
+            var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+            if (existing is null) return (false, "Opportunity not found.");
+
+            if (!existing.IsApproved) return (true, "Already pending.");
 
             existing.IsApproved = false;
             existing.ApprovedAt = null;
             existing.ApprovedByUserId = null;
 
             await db.SaveChangesAsync(ct);
-            return (true, "Deletion request submitted for approval.");
-        }
+            return (true, "Opportunity set to pending.");
+        });
 
-        db.VolunteerOpportunities.Remove(existing);
-        await db.SaveChangesAsync(ct);
-        return (true, "Opportunity deleted.");
-    }
+    public Task<(bool ok, string message)> ApproveDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+        {
+            if (!actor.CanApprove)
+                return (false, "Not authorized.");
 
-    public async Task<(bool ok, string message)> ApproveAsync(int id, ActorContext actor, CancellationToken ct = default)
-    {
-        if (!actor.CanApprove)
-            return (false, "Not authorized.");
+            var existing = await db.VolunteerOpportunities
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+            if (existing is null)
+                return (false, "Opportunity not found.");
 
-        var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (existing is null) return (false, "Opportunity not found.");
+            if (!existing.IsDeletionRequested)
+                return (false, "No deletion request is pending for this opportunity.");
 
-        if (existing.IsApproved) return (true, "Already approved.");
+            if (HasEnded(existing))
+                return (false, "This opportunity has already ended and can no longer be deleted.");
 
-        existing.IsApproved = true;
-        existing.ApprovedAt = DateTime.UtcNow;
-        existing.ApprovedByUserId = actor.UserId;
+            db.VolunteerOpportunities.Remove(existing);
+            await db.SaveChangesAsync(ct);
 
-        await db.SaveChangesAsync(ct);
-        return (true, "Opportunity approved.");
-    }
+            return (true, "Deletion approved. Opportunity deleted.");
+        });
 
-    public async Task<(bool ok, string message)> UnapproveAsync(int id, ActorContext actor, CancellationToken ct = default)
-    {
-        if (!actor.CanApprove)
-            return (false, "Not authorized.");
+    public Task<(bool ok, string message)> RejectDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
+        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+        {
+            if (!actor.CanApprove)
+                return (false, "Not authorized.");
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var existing = await db.VolunteerOpportunities
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-        var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
-        if (existing is null) return (false, "Opportunity not found.");
+            if (existing is null)
+                return (false, "Opportunity not found.");
 
-        if (!existing.IsApproved) return (true, "Already pending.");
+            if (!existing.IsDeletionRequested)
+                return (true, "No deletion request is pending for this opportunity.");
 
-        existing.IsApproved = false;
-        existing.ApprovedAt = null;
-        existing.ApprovedByUserId = null;
+            existing.IsDeletionRequested = false;
+            existing.DeletionRequestedAt = null;
+            existing.DeletionRequestedByUserId = null;
 
-        await db.SaveChangesAsync(ct);
-        return (true, "Opportunity set to pending.");
-    }
+            await db.SaveChangesAsync(ct);
 
-    public async Task<(bool ok, string message)> ApproveDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
-    {
-        if (!actor.CanApprove)
-            return (false, "Not authorized.");
-
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var existing = await db.VolunteerOpportunities
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-
-        if (existing is null)
-            return (false, "Opportunity not found.");
-
-        if (!existing.IsDeletionRequested)
-            return (false, "No deletion request is pending for this opportunity.");
-
-        if (HasEnded(existing))
-            return (false, "This opportunity has already ended and can no longer be deleted.");
-
-        db.VolunteerOpportunities.Remove(existing);
-        await db.SaveChangesAsync(ct);
-
-        return (true, "Deletion approved. Opportunity deleted.");
-    }
-
-    public async Task<(bool ok, string message)> RejectDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
-    {
-        if (!actor.CanApprove)
-            return (false, "Not authorized.");
-
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var existing = await db.VolunteerOpportunities
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
-
-        if (existing is null)
-            return (false, "Opportunity not found.");
-
-        if (!existing.IsDeletionRequested)
-            return (true, "No deletion request is pending for this opportunity.");
-
-        existing.IsDeletionRequested = false;
-        existing.DeletionRequestedAt = null;
-        existing.DeletionRequestedByUserId = null;
-
-        await db.SaveChangesAsync(ct);
-
-        return (true, "Deletion request rejected.");
-    }
+            return (true, "Deletion request rejected.");
+        });
 
     private static OpportunityRow MapRow(VolunteerOpportunity o)
     {
@@ -460,65 +448,61 @@ public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDb
         };
     }
 
-    public async Task<List<VolunteerOpportunity>> GetApprovedAvailableForUserAsync(
+    public Task<List<VolunteerOpportunity>> GetApprovedAvailableForUserAsync(
         string userId,
         CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        => dbg.ExecuteAsync(async db =>
+        {
+            return await db.VolunteerOpportunities
+                .AsNoTracking()
+                .Include(o => o.Contact)
+                .ThenInclude(c => c.Address)
+                .Where(o => o.IsApproved)
+                .Where(o => !db.VolunteerSignups.Any(s =>
+                    s.UserId == userId && s.VolunteerOpportunityId == o.Id))
+                .OrderBy(o => o.Date)
+                .ToListAsync(ct);
+        });
 
-        // IMPORTANT: avoid referencing db.* inside the LINQ (can cause translation/provider issues)
-        // Use a NOT EXISTS with a correlated subquery on the same context set (safe for Postgres)
-        return await db.VolunteerOpportunities
-            .AsNoTracking()
-            .Include(o => o.Contact)
-            .ThenInclude(c => c.Address)
-            .Where(o => o.IsApproved)
-            .Where(o => !db.VolunteerSignups.Any(s =>
-                s.UserId == userId && s.VolunteerOpportunityId == o.Id))
-            .OrderBy(o => o.Date)
-            .ToListAsync(ct);
-    }
-
-    public async Task<(bool ok, string? error)> SignupAsync(
+    public Task<(bool ok, string? error)> SignupAsync(
         int opportunityId,
         string userId,
         CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var opp = await db.VolunteerOpportunities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
-
-        if (opp is null)
-            return (false, "Opportunity not found.");
-
-        if (!opp.IsApproved)
-            return (false, "This opportunity is not approved yet.");
-
-        if (HasEnded(opp))
-            return (false, "This opportunity has already ended.");
-
-        var exists = await db.VolunteerSignups
-            .AnyAsync(s => s.VolunteerOpportunityId == opportunityId && s.UserId == userId, ct);
-
-        if (exists)
-            return (false, "You are already signed up for this opportunity.");
-
-        db.VolunteerSignups.Add(new VolunteerSignup
+        => dbg.ExecuteAsync<(bool ok, string? error)>(async db =>
         {
-            VolunteerOpportunityId = opportunityId,
-            UserId = userId,
-            SignedUpAt = DateTime.UtcNow,
+            var opp = await db.VolunteerOpportunities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
 
-            AttendanceSubmitted = false,
-            AttendanceSubmittedAt = null,
-            AttendanceApproved = false,
-            AttendanceApprovedAt = null,
-            ApprovedByUserId = null
+            if (opp is null)
+                return (false, "Opportunity not found.");
+
+            if (!opp.IsApproved)
+                return (false, "This opportunity is not approved yet.");
+
+            if (HasEnded(opp))
+                return (false, "This opportunity has already ended.");
+
+            var exists = await db.VolunteerSignups
+                .AnyAsync(s => s.VolunteerOpportunityId == opportunityId && s.UserId == userId, ct);
+
+            if (exists)
+                return (false, "You are already signed up for this opportunity.");
+
+            db.VolunteerSignups.Add(new VolunteerSignup
+            {
+                VolunteerOpportunityId = opportunityId,
+                UserId = userId,
+                SignedUpAt = DateTime.UtcNow,
+
+                AttendanceSubmitted = false,
+                AttendanceSubmittedAt = null,
+                AttendanceApproved = false,
+                AttendanceApprovedAt = null,
+                ApprovedByUserId = null
+            });
+
+            await db.SaveChangesAsync(ct);
+            return (true, null);
         });
-
-        await db.SaveChangesAsync(ct);
-        return (true, null);
-    }
 }

@@ -762,12 +762,12 @@ input.input-validation-error {
     font-weight: 600;
 }
 
-    .btn-blue-glass:hover,
-    .btn-blue-glass:focus {
-        background-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
-        border-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-border-alpha)); /* full border */
-        color: var(--glass-btn-text-color);
-    }
+.btn-blue-glass:hover,
+.btn-blue-glass:focus {
+    background-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+    border-color: rgba(var(--glass-btn-blue), var(--glass-btn-hvr-border-alpha)); /* full border */
+    color: var(--glass-btn-text-color);
+}
 
 .btn-green-glass {
     background-color: rgba(var(--glass-btn-green), var(--glass-btn-fill-alpha)); /* 35% fill */
@@ -776,8 +776,8 @@ input.input-validation-error {
     font-weight: 600;
 }
 
-.btn-blue-glass:hover,
-.btn-blue-glass:focus {
+.btn-green-glass:hover,
+.btn-green-glass:focus {
     background-color: rgba(var(--glass-btn-green), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
     border-color: rgba(var(--glass-btn-green), var(--glass-btn-hvr-border-alpha)); /* full border */
     color: var(--glass-btn-text-color);
@@ -790,12 +790,12 @@ input.input-validation-error {
     font-weight: 600;
 }
 
-    .btn-red-glass:hover,
-    .btn-red-glass:focus {
-        background-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
-        border-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-border-alpha)); /* full border */
-        color: var(--glass-btn-text-color);
-    }
+.btn-red-glass:hover,
+.btn-red-glass:focus {
+    background-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-fill-alpha)); /* 55% fill */
+    border-color: rgba(var(--glass-btn-red), var(--glass-btn-hvr-border-alpha)); /* full border */
+    color: var(--glass-btn-text-color);
+}
 
 
 .btn-yellow-glass {
