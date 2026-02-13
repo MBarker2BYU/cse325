@@ -14,6 +14,7 @@
 
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServePoint.Cadet.Models.Entities;
 
 namespace ServePoint.Cadet.Data;
@@ -27,6 +28,30 @@ namespace ServePoint.Cadet.Data;
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
     : IdentityDbContext<ApplicationUser>(options)
 {
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        var boolToInt = new BoolToZeroOneConverter<int>();
+
+        builder.Entity<VolunteerOpportunity>()
+            .Property(x => x.IsApproved)
+            .HasConversion(boolToInt);
+
+        builder.Entity<VolunteerOpportunity>()
+            .Property(x => x.IsDeletionRequested)
+            .HasConversion(boolToInt);
+
+        builder.Entity<VolunteerSignup>()
+            .Property(x => x.AttendanceSubmitted)
+            .HasConversion(boolToInt);
+
+        builder.Entity<VolunteerSignup>()
+            .Property(x => x.AttendanceApproved)
+            .HasConversion(boolToInt);
+
+    }
+
     /// <summary>
     /// Gets the volunteer opportunities.
     /// </summary>
