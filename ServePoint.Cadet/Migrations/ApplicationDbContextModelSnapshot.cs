@@ -253,7 +253,7 @@ namespace ServePoint.Cadet.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Addresses");
+                    b.ToTable("Addresses", (string)null);
                 });
 
             modelBuilder.Entity("ServePoint.Cadet.Models.Entities.Contact", b =>
@@ -282,7 +282,7 @@ namespace ServePoint.Cadet.Migrations
 
                     b.HasIndex("AddressId");
 
-                    b.ToTable("Contacts");
+                    b.ToTable("Contacts", (string)null);
                 });
 
             modelBuilder.Entity("ServePoint.Cadet.Models.Entities.UserEmblem", b =>
@@ -295,7 +295,7 @@ namespace ServePoint.Cadet.Migrations
 
                     b.HasKey("UserId");
 
-                    b.ToTable("UserEmblems");
+                    b.ToTable("UserEmblems", (string)null);
                 });
 
             modelBuilder.Entity("ServePoint.Cadet.Models.Entities.VolunteerOpportunity", b =>
@@ -361,7 +361,7 @@ namespace ServePoint.Cadet.Migrations
 
                     b.HasIndex("ContactId");
 
-                    b.ToTable("VolunteerOpportunities");
+                    b.ToTable("VolunteerOpportunities", (string)null);
                 });
 
             modelBuilder.Entity("ServePoint.Cadet.Models.Entities.VolunteerSignup", b =>
@@ -399,7 +399,7 @@ namespace ServePoint.Cadet.Migrations
 
                     b.HasIndex("VolunteerOpportunityId");
 
-                    b.ToTable("VolunteerSignups");
+                    b.ToTable("VolunteerSignups", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
