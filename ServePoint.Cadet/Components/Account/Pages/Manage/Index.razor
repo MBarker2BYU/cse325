@@ -88,6 +88,7 @@
     {
         Input ??= new();
 
+        // One DB hit: get the current user
         m_User = await UserManager.GetUserAsync(HttpContext.User);
         if (m_User is null)
         {
@@ -95,10 +96,11 @@
             return;
         }
 
-        m_Username = await UserManager.GetUserNameAsync(m_User);
-        m_PhoneNumber = await UserManager.GetPhoneNumberAsync(m_User);
+        // Avoid extra store/DbContext calls: read from the user instance
+        m_Username = m_User.UserName;
+        m_PhoneNumber = m_User.PhoneNumber;
 
-        // ✅ Only prefill on initial GET; do NOT overwrite POSTed form values
+        // Only prefill on initial GET; do NOT overwrite POSTed form values
         if (!HttpMethods.IsPost(HttpContext.Request.Method))
         {
             Input.FirstName = m_User.FirstName ?? "";
@@ -110,7 +112,10 @@
 
     private async Task OnValidSubmitAsync()
     {
-        if (m_User is null)
+        // Re-fetch a fresh user instance for this POST.
+        // This avoids holding onto an entity that might be tied to an in-flight DbContext operation.
+        var user = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
@@ -124,17 +129,17 @@
             : Input.MiddleName.Trim();
 
         var nameChanged =
-            !string.Equals(m_User.FirstName, newFirst, StringComparison.Ordinal) ||
-            !string.Equals(m_User.LastName, newLast, StringComparison.Ordinal) ||
-            !string.Equals(m_User.MiddleName, newMiddle, StringComparison.Ordinal);
+            !string.Equals(user.FirstName, newFirst, StringComparison.Ordinal) ||
+            !string.Equals(user.LastName, newLast, StringComparison.Ordinal) ||
+            !string.Equals(user.MiddleName, newMiddle, StringComparison.Ordinal);
 
         if (nameChanged)
         {
-            m_User.FirstName = newFirst;
-            m_User.LastName = newLast;
-            m_User.MiddleName = newMiddle;
+            user.FirstName = newFirst;
+            user.LastName = newLast;
+            user.MiddleName = newMiddle;
 
-            var updateResult = await UserManager.UpdateAsync(m_User);
+            var updateResult = await UserManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
             {
                 var msg = "Error: " + string.Join(", ", updateResult.Errors.Select(e => e.Description));
@@ -144,9 +149,12 @@
         }
 
         // ---- Phone number logic ----
-        if (Input.PhoneNumber != m_PhoneNumber)
+        // Compare against current value from the freshly loaded user
+        var currentPhone = user.PhoneNumber;
+
+        if (!string.Equals(Input.PhoneNumber, currentPhone, StringComparison.Ordinal))
         {
-            var setPhoneResult = await UserManager.SetPhoneNumberAsync(m_User, Input.PhoneNumber);
+            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
             if (!setPhoneResult.Succeeded)
             {
                 var msg = "Error: " + string.Join(", ", setPhoneResult.Errors.Select(e => e.Description));
@@ -155,7 +163,13 @@
             }
         }
 
-        await SignInManager.RefreshSignInAsync(m_User);
+        await SignInManager.RefreshSignInAsync(user);
+
+        // Keep local fields in sync (nice for immediate UI render)
+        m_User = user;
+        m_Username = user.UserName;
+        m_PhoneNumber = user.PhoneNumber;
+
         RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
     }
 

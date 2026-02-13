@@ -1,14 +1,14 @@
 ﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
 @using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Data
 @using ServePoint.Cadet.Extensions
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
-
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -16,14 +16,6 @@
     </div>
 </div>
 
-@* <input type="checkbox" title="Navigation menu" class="navbar-toggler" /> *@
-
-<!-- IMPORTANT:
-     .nav-scrollable MUST remain a sibling of .navbar-toggler
-     because AppMenu.razor.css uses:
-     .navbar-toggler:checked ~ .nav-scrollable { display:block; }
--->
-@* <div class="nav-scrollable sp-navshell" onclick="document.querySelector('.navbar-toggler').click()"> *@
 <div class="nav-scrollable sp-navshell">
 
     <!-- SCROLLING AREA -->
@@ -56,14 +48,10 @@
             <AuthorizeView>
                 <Authorized>
                     <div class="nav-item px-3">
-                        <form action="Account/Logout" method="post">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@m_CurrentUrl" />
-                            <button type="submit" class="nav-link">
-                                <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
-                                Logout
-                            </button>
-                        </form>
+                        <NavLink class="nav-link" href="Account/Logout">
+                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
+                            Logout
+                        </NavLink>
                     </div>
                 </Authorized>
 
@@ -89,7 +77,7 @@
     <!-- LOCKED BOTTOM AREA (NO SCROLL) -->
     <div class="sp-sidebar-bottom">
 
-        <AuthorizeView>
+        <AuthorizeView Context="auth">
             <Authorized>
                 <a class="sp-usercard-link" href="Account/Manage" onclick="event.stopPropagation();">
                     <div class="sp-usercard sp-usercard-big">
@@ -101,9 +89,9 @@
                         }
 
                         <div class="sp-usercard-service">@m_Emblem.ToDisplay()</div>
-                        @* <div class="sp-usercard-identity">@context.User.Identity?.Name</div> *@
-                        <div class="sp-usercard-identity">@(!string.IsNullOrWhiteSpace(m_DisplayName) ? m_DisplayName : context.User.Identity?.Name)</div>
-
+                        <div class="sp-usercard-identity">
+                            @(!string.IsNullOrWhiteSpace(m_DisplayName) ? m_DisplayName : auth.User.Identity?.Name)
+                        </div>
                     </div>
                 </a>
             </Authorized>
@@ -118,43 +106,95 @@
 </div>
 
 @code {
-    private string? m_CurrentUrl;
+    // Always send ReturnUrl with a leading "/" (or "/") so Identity doesn't redirect to a non-route.
+    private string m_ReturnUrl = "/";
 
     private ServiceEmblem m_Emblem = ServiceEmblem.None;
     private string? m_EmblemPath;
-
     private string? m_DisplayName;
 
     protected override void OnInitialized()
     {
-        m_CurrentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        // SetReturnUrl(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        // Refresh usercard when auth state changes (login/logout)
+        AuthStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
     }
 
-    protected override async Task OnInitializedAsync()
+    // private void SetReturnUrl(string absoluteUri)
+    // {
+    //     var rel = NavigationManager.ToBaseRelativePath(absoluteUri);
+
+    //     // Normalize:
+    //     // "" -> "/"
+    //     // "dashboard" -> "/dashboard"
+    //     // "Account/Login?x=1" -> "/Account/Login?x=1"
+    //     m_ReturnUrl = string.IsNullOrWhiteSpace(rel) ? "/" : "/" + rel;
+    // }
+
+    private async void OnAuthStateChanged(Task<AuthenticationState> task)
     {
-        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = await UserManager.GetUserAsync(auth.User);
-
-        if (user is not null)
+        try
         {
-            m_DisplayName = user.DisplayName;
-
-            var record = await Db.UserEmblems.FindAsync(user.Id);
-            m_Emblem = record?.Emblem ?? ServiceEmblem.None;
-            m_EmblemPath = m_Emblem.ToImagePath();
+            var state = await task;
+            await RefreshUserCardAsync(state.User);
         }
+        catch
+        {
+            // ignore; UI will still fall back safely
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        // Also refresh on first render / navigation
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        await RefreshUserCardAsync(auth.User);
+    }
+
+    private async Task RefreshUserCardAsync(System.Security.Claims.ClaimsPrincipal principal)
+    {
+        // Not logged in -> clear card
+        if (principal?.Identity?.IsAuthenticated != true)
+        {
+            m_DisplayName = null;
+            m_Emblem = ServiceEmblem.None;
+            m_EmblemPath = null;
+            return;
+        }
+
+        var user = await UserManager.GetUserAsync(principal);
+        if (user is null)
+        {
+            m_DisplayName = null;
+            m_Emblem = ServiceEmblem.None;
+            m_EmblemPath = null;
+            return;
+        }
+
+        m_DisplayName = user.DisplayName;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var record = await db.UserEmblems
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == user.Id);
+
+        m_Emblem = record?.Emblem ?? ServiceEmblem.None;
+        m_EmblemPath = m_Emblem.ToImagePath();
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        m_CurrentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        // SetReturnUrl(e.Location);
         StateHasChanged();
     }
 
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
     }
 }

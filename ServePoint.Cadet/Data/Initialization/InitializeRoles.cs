@@ -4,7 +4,7 @@
 // Created          : 02-09-2026
 //
 // Last Modified By : Matthew D. Barker
-// Last Modified On : 02-09-2026
+// Last Modified On : 02-13-2026
 // ***********************************************************************
 // <copyright file="InitializeRoles.cs" company="ServePoint.Cadet">
 //     Copyright (c) Matthew D. Barker. All rights reserved.
@@ -18,27 +18,25 @@ using ServePoint.Cadet.Auth;
 namespace ServePoint.Cadet.Data.Initialization;
 
 /// <summary>
-/// Class InitializeRoles.
+/// Ensures all application roles exist (idempotent).
 /// </summary>
 public static class InitializeRoles
 {
-    /// <summary>
-    /// Run as an asynchronous operation.
-    /// </summary>
-    /// <param name="services">The services.</param>
-    /// <returns>A Task representing the asynchronous operation.</returns>
-    /// <exception cref="System.Exception">Failed to create role: {role}</exception>
     public static async Task RunAsync(IServiceProvider services)
     {
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
         foreach (var role in Roles.All)
         {
-            if (!await roleManager.RoleExistsAsync(role))
+            if (await roleManager.RoleExistsAsync(role))
+                continue;
+
+            var result = await roleManager.CreateAsync(new IdentityRole(role));
+            if (!result.Succeeded)
             {
-                var result = await roleManager.CreateAsync(new IdentityRole(role));
-                if (!result.Succeeded)
-                    throw new Exception($"Failed to create role: {role}");
+                throw new InvalidOperationException(
+                    $"Failed to create role '{role}': " +
+                    string.Join("; ", result.Errors.Select(e => e.Description)));
             }
         }
     }

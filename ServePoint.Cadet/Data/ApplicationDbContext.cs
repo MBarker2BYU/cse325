@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServePoint.Cadet.Models.Entities;
+using System.Reflection.Emit;
 
 namespace ServePoint.Cadet.Data;
 
@@ -34,21 +35,23 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         var boolToInt = new BoolToZeroOneConverter<int>();
 
-        builder.Entity<VolunteerOpportunity>()
-            .Property(x => x.IsApproved)
-            .HasConversion(boolToInt);
+        builder.Entity<VolunteerOpportunity>(entity =>
+        {
+            entity.Property(x => x.IsApproved)
+                .HasConversion(boolToInt);
 
-        builder.Entity<VolunteerOpportunity>()
-            .Property(x => x.IsDeletionRequested)
-            .HasConversion(boolToInt);
+            entity.Property(x => x.IsDeletionRequested)
+                .HasConversion(boolToInt);
+        });
 
-        builder.Entity<VolunteerSignup>()
-            .Property(x => x.AttendanceSubmitted)
-            .HasConversion(boolToInt);
+        builder.Entity<VolunteerSignup>(entity =>
+        {
+            entity.Property(x => x.AttendanceSubmitted)
+                .HasConversion(boolToInt);
 
-        builder.Entity<VolunteerSignup>()
-            .Property(x => x.AttendanceApproved)
-            .HasConversion(boolToInt);
+            entity.Property(x => x.AttendanceApproved)
+                .HasConversion(boolToInt);
+        });
 
     }
 

@@ -4,7 +4,7 @@
 // Created          : 02-09-2026
 //
 // Last Modified By : Matthew D. Barker
-// Last Modified On : 02-09-2026
+// Last Modified On : 02-13-2026
 // ***********************************************************************
 // <copyright file="InitializeIdentity.cs" company="ServePoint.Cadet">
 //     Copyright (c) Matthew D. Barker. All rights reserved.
@@ -18,23 +18,18 @@ using ServePoint.Cadet.Auth;
 namespace ServePoint.Cadet.Data.Initialization;
 
 /// <summary>
-/// Class InitializeIdentity.
+/// Seeds the protected (built-in) admin account and ensures it has Admin role.
 /// </summary>
 public static class InitializeIdentity
 {
-    /// <summary>
-    /// Run as an asynchronous operation.
-    /// </summary>
-    /// <param name="services">The services.</param>
-    /// <returns>A Task representing the asynchronous operation.</returns>
-    /// <exception cref="System.InvalidOperationException">Missing DefaultAdmin:Password</exception>
-    /// <exception cref="System.Exception">Failed to create protected admin</exception>
     public static async Task RunAsync(IServiceProvider services)
     {
         var config = services.GetRequiredService<IConfiguration>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
         var adminEmail = AdminSentinel.GetProtectedAdminEmail(config);
+
+        // Keep compatibility with your existing config key
         var adminPassword = config["DefaultAdmin:Password"]
                             ?? throw new InvalidOperationException("Missing DefaultAdmin:Password");
 
@@ -49,14 +44,59 @@ public static class InitializeIdentity
                 EmailConfirmed = true
             };
 
-            var result = await userManager.CreateAsync(adminUser, adminPassword);
-            if (!result.Succeeded)
-                throw new Exception("Failed to create protected admin");
+            var create = await userManager.CreateAsync(adminUser, adminPassword);
+            if (!create.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Failed to create protected admin: " +
+                    string.Join("; ", create.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            // Ensure email/username are consistent (idempotent)
+            var changed = false;
+
+            if (!string.Equals(adminUser.UserName, adminEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                adminUser.UserName = adminEmail;
+                changed = true;
+            }
+
+            if (!string.Equals(adminUser.Email, adminEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                adminUser.Email = adminEmail;
+                changed = true;
+            }
+
+            if (!adminUser.EmailConfirmed)
+            {
+                adminUser.EmailConfirmed = true;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                var update = await userManager.UpdateAsync(adminUser);
+                if (!update.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        "Failed to update protected admin: " +
+                        string.Join("; ", update.Errors.Select(e => e.Description)));
+                }
+            }
         }
 
+        // Ensure Admin role membership
         if (!await userManager.IsInRoleAsync(adminUser, Roles.Admin))
         {
-            await userManager.AddToRoleAsync(adminUser, Roles.Admin);
+            var addRole = await userManager.AddToRoleAsync(adminUser, Roles.Admin);
+            if (!addRole.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Failed to assign Admin role to protected admin: " +
+                    string.Join("; ", addRole.Errors.Select(e => e.Description)));
+            }
         }
     }
 }

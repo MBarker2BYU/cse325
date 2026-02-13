@@ -1,52 +1,40 @@
-﻿// ***********************************************************************
-// Assembly         : ServePoint.Cadet
-// Author           : Matthew D. Barker
-// Created          : 02-09-2026
-//
-// Last Modified By : Matthew D. Barker
-// Last Modified On : 02-09-2026
-// ***********************************************************************
-// <copyright file="InitializeDefaultUserRole.cs" company="ServePoint.Cadet">
-//     Copyright (c) Matthew D. Barker. All rights reserved.
-// </copyright>
-// <summary></summary>
-// ***********************************************************************
-
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ServePoint.Cadet.Auth;
 
 namespace ServePoint.Cadet.Data.Initialization;
 
 /// <summary>
-/// Class InitializeDefaultUserRole.
+/// Ensures every non-staff account has at least the default User role.
+/// Instructors and Admins are NOT modified.
 /// </summary>
 public static class InitializeDefaultUserRole
 {
-    /// <summary>
-    /// Run as an asynchronous operation.
-    /// </summary>
-    /// <param name="services">The services.</param>
-    /// <returns>A Task representing the asynchronous operation.</returns>
-    /// <exception cref="System.Exception">Failed to assign default User role to {user.Email ?? user.Id}</exception>
     public static async Task RunAsync(IServiceProvider services)
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-        var users = await userManager.Users.AsNoTracking().ToListAsync();
+        // Load users from store
+        var users = await userManager.Users.ToListAsync();
 
-        // Enumerate users directly from the store (safe for SQLite/Postgres)
         foreach (var user in users)
         {
             var roles = await userManager.GetRolesAsync(user);
 
+            // Skip staff accounts (they should never be auto-modified)
+            if (roles.Contains(Roles.Admin) || roles.Contains(Roles.Instructor))
+                continue;
+
+            // If user has no roles at all, assign default User role
             if (roles.Count == 0)
             {
                 var result = await userManager.AddToRoleAsync(user, Roles.User);
+
                 if (!result.Succeeded)
                 {
-                    throw new Exception(
-                        $"Failed to assign default User role to {user.Email ?? user.Id}");
+                    throw new InvalidOperationException(
+                        $"Failed to assign default User role to {user.Email ?? user.Id}: " +
+                        string.Join("; ", result.Errors.Select(e => e.Description)));
                 }
             }
         }

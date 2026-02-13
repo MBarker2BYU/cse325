@@ -4,11 +4,12 @@
 @using ServePoint.Cadet.Data
 @using ServePoint.Cadet.Extensions
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
 @using ServePoint.Cadet.Models.Entities
 
 @attribute [Authorize]
 
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Manage your account - Emblem</PageTitle>
@@ -113,7 +114,12 @@
             return;
         }
 
-        var record = await Db.UserEmblems.FindAsync(userId);
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var record = await db.UserEmblems
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId);
+
         _selected = record?.Emblem ?? ServiceEmblem.None;
         _previewPath = _selected.ToImagePath();
     }
@@ -132,13 +138,15 @@
 
     private async Task SaveAsync()
     {
+        if(_saving) return;
+
         _saving = true;
         _statusMessage = null;
 
         try
         {
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-            var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userId = auth.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value?.Trim();
 
             if (string.IsNullOrWhiteSpace(userId))
             {
@@ -146,25 +154,29 @@
                 return;
             }
 
-            var record = await Db.UserEmblems.FindAsync(userId);
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var record = await db.UserEmblems
+               .FirstOrDefaultAsync(x => x.UserId == userId);
+
             if (record is null)
             {
                 record = new UserEmblem { UserId = userId, Emblem = _selected };
-                Db.UserEmblems.Add(record);
+                db.UserEmblems.Add(record);
             }
             else
             {
                 record.Emblem = _selected;
             }
 
-            await Db.SaveChangesAsync();
+            await db.SaveChangesAsync();
 
             _previewPath = _selected.ToImagePath();
             _statusMessage = "Saved.";
         }
-        catch
+        catch(Exception ex)
         {
-            _statusMessage = "Error saving emblem.";
+            _statusMessage = "Error saving emblem: " + ex.Message;
         }
         finally
         {

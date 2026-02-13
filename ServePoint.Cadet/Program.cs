@@ -1,101 +1,59 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics; // ✅ ADD THIS
 using ServePoint.Cadet.Components;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Initialization;
 using ServePoint.Cadet.Data.Services;
-using System.Data.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Razor / Blazor
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Identity (Blazor)
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
+// DB
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    if (builder.Environment.IsDevelopment())
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseNpgsql(connectionString);
+builder.Services.AddDbContext<ApplicationDbContext>(
+    options => options.UseNpgsql(connectionString),
+    contextLifetime: ServiceLifetime.Scoped,
+    optionsLifetime: ServiceLifetime.Singleton
+);
 
-        // ✅ Render: don't crash on this warning during MigrateAsync()
-        options.ConfigureWarnings(w =>
-            w.Ignore(RelationalEventId.PendingModelChangesWarning));
-    }
-});
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
+// Identity
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = true; // consider false for testing
+        options.SignIn.RequireConfirmedAccount = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
+// Email (noop)
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+// App Services
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<OpportunityManagementService>();
 builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 
-//
-// --- DB PREFLIGHT (safe) ---
-//
-try
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    Console.WriteLine($"DB Provider: {db.Database.ProviderName}");
-    await using DbConnection conn = db.Database.GetDbConnection();
-    Console.WriteLine($"DB DataSource: {conn.DataSource}");
-
-    await conn.OpenAsync();
-
-    // Basic query proves connectivity
-    await using (var cmd = conn.CreateCommand())
-    {
-        cmd.CommandText = db.Database.IsSqlite() ? "SELECT sqlite_version();" : "SELECT version();";
-        var result = await cmd.ExecuteScalarAsync();
-        Console.WriteLine($"Preflight OK: {result}");
-    }
-
-    // Show pending migrations (proves EF can see them)
-    var pending = await db.Database.GetPendingMigrationsAsync();
-    Console.WriteLine("Pending migrations: " + string.Join(", ", pending));
-
-    // Apply migrations (creates AspNetRoles etc.)
-    await db.Database.MigrateAsync();
-    Console.WriteLine("MigrateAsync completed.");
-
-    await conn.CloseAsync();
-}
-catch (Exception ex)
-{
-    Console.WriteLine("Preflight FAILED:");
-    Console.WriteLine(ex);
-    Environment.Exit(1);
-}
-// --- end preflight ---
-
+// Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -114,8 +72,12 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapAdditionalIdentityEndpoints();
+//app.MapAdditionalIdentityEndpoints();
 
-await DatabaseInitializer.EnsureHealthyAsync(app.Services, app.Environment);
+// Initialization MUST be run in a scope
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    await DatabaseInitializer.EnsureHealthyAsync(scope.ServiceProvider, app.Environment);
+}
 
 app.Run();

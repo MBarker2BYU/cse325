@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Models.Entities;
 using ServePoint.Cadet.Models.Opportunities;
 
 namespace ServePoint.Cadet.Data.Services;
 
-public sealed class OpportunityManagementService(ApplicationDbContext db)
+public sealed class OpportunityManagementService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
     public sealed record ActorContext(
         string UserId,
@@ -16,7 +17,7 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         public bool CanApprove => IsInstructor || IsAdmin;
         public bool AutoApprove => IsInstructor || IsAdmin;
 
-        // Business rule (matches your prior page): only Organizer/Instructor/Admin can change hours after creation
+        // Business rule: only Organizer/Instructor/Admin can change hours after creation
         public bool CanEditHours => IsOrganizer || IsInstructor || IsAdmin;
     }
 
@@ -52,36 +53,47 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         public string PostalCode { get; init; } = "";
     }
 
-    // ===== Time helpers =====
-    private static DateTime StartDateTime(DateTime date, TimeOnly start)
-        => date.Date.Add(start.ToTimeSpan());
+    // ===== Date/Time helpers =====
+    // PostgreSQL "timestamptz" requires UTC DateTime values in Npgsql.
+    // Treat the event "Date" as a date-only concept stored as UTC midnight.
+    private static DateTime NormalizeEventDateUtc(DateTime date)
+        => DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
 
-    private static DateTime EndDateTime(DateTime date, TimeOnly start, TimeOnly end)
+    private static DateTime StartDateTime(DateTime dateUtcMidnight, TimeOnly start)
     {
-        var endDt = date.Date.Add(end.ToTimeSpan());
+        var dt = NormalizeEventDateUtc(dateUtcMidnight).Add(start.ToTimeSpan());
+        return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+    }
+
+    private static DateTime EndDateTime(DateTime dateUtcMidnight, TimeOnly start, TimeOnly end)
+    {
+        var baseDate = NormalizeEventDateUtc(dateUtcMidnight);
+
+        var endDt = baseDate.Add(end.ToTimeSpan());
+
         // Overnight: ends next day
         if (end <= start)
             endDt = endDt.AddDays(1);
 
-        return endDt;
+        return DateTime.SpecifyKind(endDt, DateTimeKind.Utc);
     }
-    
+
     private static bool HasEnded(VolunteerOpportunity o)
-        => EndDateTime(o.Date, o.StartTime, o.EndTime) <= DateTime.Now;
+        => EndDateTime(o.Date, o.StartTime, o.EndTime) <= DateTime.UtcNow;
 
     private static bool HasEnded(OpportunityRow row)
-        => EndDateTime(row.Date, row.StartTime, row.EndTime) <= DateTime.Now;
-
+        => EndDateTime(row.Date, row.StartTime, row.EndTime) <= DateTime.UtcNow;
 
     private static bool ValidateTimes(TimeOnly start, TimeOnly end, out string? error)
     {
         error = null;
-        
         return true;
     }
 
     public async Task<List<OpportunityRow>> GetAllAsync(CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var items = await db.VolunteerOpportunities
             .AsNoTracking()
             .Include(o => o.Contact)
@@ -97,8 +109,10 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!actor.CanManage)
             return (false, "Not authorized.");
 
-        // Normalize + validate times
-        input.Date = input.Date.Date;
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        // Normalize to UTC midnight to satisfy Npgsql timestamptz rules
+        input.Date = NormalizeEventDateUtc(input.Date);
 
         if (!ValidateTimes(input.StartTime, input.EndTime, out var timeError))
             return (false, timeError!);
@@ -125,7 +139,7 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
             Title = input.Title.Trim(),
             Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
 
-            Date = input.Date.Date,
+            Date = input.Date, // already normalized UTC midnight
             StartTime = input.StartTime,
             EndTime = input.EndTime,
 
@@ -151,6 +165,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
 
     public async Task<(bool ok, string message, EditModel? model)> GetEditModelAsync(int id, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var existing = await db.VolunteerOpportunities
             .AsNoTracking()
             .Include(o => o.Contact)
@@ -196,8 +212,10 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!actor.CanManage)
             return (false, "Not authorized.");
 
-        // Normalize + validate times
-        input.Date = input.Date.Date;
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        // Normalize to UTC midnight to satisfy Npgsql timestamptz rules
+        input.Date = NormalizeEventDateUtc(input.Date);
 
         if (!ValidateTimes(input.StartTime, input.EndTime, out var timeError))
             return (false, timeError!);
@@ -210,34 +228,28 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (existing is null)
             return (false, "Opportunity not found.");
 
-        // Everyone: cannot edit after the event has ended (uses END time)
         if (HasEnded(existing))
             return (false, "This opportunity has already ended and can no longer be edited.");
 
-        // Organizer-only: cannot edit on the event date (only up to the day before)
         var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
-        if (organizerOnly && existing.Date.Date == DateTime.Today)
+        if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
             return (false, "Organizers can only edit opportunities until the day before the event.");
 
-        // Apply opportunity changes
         existing.Title = input.Title.Trim();
         existing.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
 
-        existing.Date = input.Date.Date;
+        existing.Date = input.Date; // already normalized UTC midnight
         existing.StartTime = input.StartTime;
         existing.EndTime = input.EndTime;
 
-        // Hours rule: only Instructor/Admin can change hours after creation (your UI message)
         if (actor.CanEditHours)
             existing.Hours = input.Hours;
 
-        // Contact changes
         existing.Contact ??= new Contact();
         existing.Contact.Name = input.ContactName.Trim();
         existing.Contact.Email = string.IsNullOrWhiteSpace(input.ContactEmail) ? null : input.ContactEmail.Trim();
         existing.Contact.Phone = string.IsNullOrWhiteSpace(input.ContactPhone) ? null : input.ContactPhone.Trim();
 
-        // Address: optional; if user leaves address essentially blank, drop it
         var hasAnyAddress =
             !string.IsNullOrWhiteSpace(input.Street1) ||
             !string.IsNullOrWhiteSpace(input.City) ||
@@ -258,9 +270,6 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
             existing.Contact.Address.PostalCode = input.PostalCode.Trim();
         }
 
-        // Approval rules:
-        // - Instructor/Admin: auto-approve edits
-        // - Organizer: edits force re-approval (pending)
         var now = DateTime.UtcNow;
         if (actor.AutoApprove)
         {
@@ -287,23 +296,21 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!actor.CanManage)
             return (false, "Not authorized.");
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var existing = await db.VolunteerOpportunities
             .FirstOrDefaultAsync(o => o.Id == id, ct);
 
         if (existing is null)
             return (false, "Opportunity not found.");
 
-        // Everyone: cannot delete after the event has ended (uses END time)
         if (HasEnded(existing))
             return (false, "This opportunity has already ended and can no longer be deleted.");
 
-        // Organizer-only: cannot delete on the event date (only until day before)
         var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
-
-        if (organizerOnly && existing.Date.Date == DateTime.Today)
+        if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
             return (false, "Organizers can only delete opportunities until the day before the event.");
 
-        // Organizer: request deletion (requires approval)
         if (organizerOnly)
         {
             if (existing.IsDeletionRequested)
@@ -313,20 +320,16 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
             existing.DeletionRequestedAt = DateTime.UtcNow;
             existing.DeletionRequestedByUserId = actor.UserId;
 
-            // Deletion request forces re-approval / pending
             existing.IsApproved = false;
             existing.ApprovedAt = null;
             existing.ApprovedByUserId = null;
 
             await db.SaveChangesAsync(ct);
-
             return (true, "Deletion request submitted for approval.");
         }
 
-        // Instructor/Admin: delete immediately
         db.VolunteerOpportunities.Remove(existing);
         await db.SaveChangesAsync(ct);
-
         return (true, "Opportunity deleted.");
     }
 
@@ -334,6 +337,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
     {
         if (!actor.CanApprove)
             return (false, "Not authorized.");
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
         if (existing is null) return (false, "Opportunity not found.");
@@ -353,6 +358,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!actor.CanApprove)
             return (false, "Not authorized.");
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
         if (existing is null) return (false, "Opportunity not found.");
 
@@ -371,6 +378,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!actor.CanApprove)
             return (false, "Not authorized.");
 
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var existing = await db.VolunteerOpportunities
             .FirstOrDefaultAsync(o => o.Id == id, ct);
 
@@ -380,7 +389,6 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!existing.IsDeletionRequested)
             return (false, "No deletion request is pending for this opportunity.");
 
-        // Everyone: cannot delete after the event has ended (consistent with DeleteAsync)
         if (HasEnded(existing))
             return (false, "This opportunity has already ended and can no longer be deleted.");
 
@@ -394,6 +402,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
     {
         if (!actor.CanApprove)
             return (false, "Not authorized.");
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var existing = await db.VolunteerOpportunities
             .FirstOrDefaultAsync(o => o.Id == id, ct);
@@ -454,6 +464,10 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         string userId,
         CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        // IMPORTANT: avoid referencing db.* inside the LINQ (can cause translation/provider issues)
+        // Use a NOT EXISTS with a correlated subquery on the same context set (safe for Postgres)
         return await db.VolunteerOpportunities
             .AsNoTracking()
             .Include(o => o.Contact)
@@ -470,6 +484,8 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         string userId,
         CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+
         var opp = await db.VolunteerOpportunities
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
@@ -480,7 +496,6 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
         if (!opp.IsApproved)
             return (false, "This opportunity is not approved yet.");
 
-        // BLOCK SIGNUPS FOR ENDED EVENTS (uses END time)
         if (HasEnded(opp))
             return (false, "This opportunity has already ended.");
 
@@ -496,7 +511,6 @@ public sealed class OpportunityManagementService(ApplicationDbContext db)
             UserId = userId,
             SignedUpAt = DateTime.UtcNow,
 
-            // Attendance workflow defaults
             AttendanceSubmitted = false,
             AttendanceSubmittedAt = null,
             AttendanceApproved = false,

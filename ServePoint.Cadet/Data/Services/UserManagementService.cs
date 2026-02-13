@@ -23,50 +23,26 @@ namespace ServePoint.Cadet.Data.Services;
 /// </summary>
 public sealed class UserManagementService
 {
-    /// <summary>
-    /// The database
-    /// </summary>
-    private readonly ApplicationDbContext m_Db;
-    /// <summary>
-    /// The user manager
-    /// </summary>
+    private readonly IDbContextFactory<ApplicationDbContext> m_DbFactory;
     private readonly UserManager<ApplicationUser> m_UserManager;
-    /// <summary>
-    /// The role manager
-    /// </summary>
     private readonly RoleManager<IdentityRole> m_RoleManager;
-    /// <summary>
-    /// The configuration
-    /// </summary>
     private readonly IConfiguration m_Config;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UserManagementService"/> class.
     /// </summary>
-    /// <param name="db">The database.</param>
-    /// <param name="userManager">The user manager.</param>
-    /// <param name="roleManager">The role manager.</param>
-    /// <param name="config">The configuration.</param>
     public UserManagementService(
-        ApplicationDbContext db,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager,
         IConfiguration config)
     {
-        m_Db = db;
+        m_DbFactory = dbFactory;
         m_UserManager = userManager;
         m_RoleManager = roleManager;
         m_Config = config;
     }
 
-    /// <summary>
-    /// Class UserRow. This class cannot be inherited.
-    /// </summary>
-    /// <param name="Id">The identifier.</param>
-    /// <param name="Email">The email.</param>
-    /// <param name="UserName">Name of the user.</param>
-    /// <param name="Roles">The roles.</param>
-    /// <param name="LockoutEndUtc">The lockout end UTC.</param>
     public sealed record UserRow(
         string Id,
         string? Email,
@@ -74,13 +50,9 @@ public sealed class UserManagementService
         List<string> Roles,
         DateTimeOffset? LockoutEndUtc);
 
-
     /// <summary>
     /// Load as an asynchronous operation.
     /// </summary>
-    /// <param name="currentUserId">The current user identifier.</param>
-    /// <param name="ct">The cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-    /// <returns>A Task&lt;System.ValueTuple&gt; representing the asynchronous operation.</returns>
     public async Task<(List<UserRow> Rows, string? CurrentUserId, string ProtectedAdminEmail, int AdminCount)> LoadAsync(
         string? currentUserId,
         CancellationToken ct = default)
@@ -90,18 +62,21 @@ public sealed class UserManagementService
         // Count admins once (used for "last admin" rule)
         var adminCount = (await m_UserManager.GetUsersInRoleAsync(Roles.Admin)).Count;
 
+        // Materialize users list (safe)
         var users = await m_UserManager.Users
             .AsNoTracking()
             .OrderBy(u => u.Email)
             .Select(u => new { u.Id, u.Email, u.UserName, u.LockoutEnd })
             .ToListAsync(ct);
 
-        // Single query for all user->role names
+        // Pull role mappings via a fresh DbContext (prevents "second operation on this context" issues)
+        await using var db = await m_DbFactory.CreateDbContextAsync(ct);
+
         var userRoles = await (
-            from ur in m_Db.UserRoles
-            join r in m_Db.Roles on ur.RoleId equals r.Id
+            from ur in db.UserRoles
+            join r in db.Roles on ur.RoleId equals r.Id
             select new { ur.UserId, RoleName = r.Name! }
-        ).ToListAsync(ct);
+        ).AsNoTracking().ToListAsync(ct);
 
         var roleLookup = userRoles
             .GroupBy(x => x.UserId)
@@ -123,13 +98,6 @@ public sealed class UserManagementService
         return (rows, currentUserId, protectedAdminEmail, adminCount);
     }
 
-    /// <summary>
-    /// Add role as an asynchronous operation.
-    /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="role">The role.</param>
-    /// <param name="ct">The cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-    /// <returns>A Task&lt;System.ValueTuple&gt; representing the asynchronous operation.</returns>
     public async Task<(bool Ok, string Message)> AddRoleAsync(string userId, string role, CancellationToken ct = default)
     {
         if (!await m_RoleManager.RoleExistsAsync(role))
@@ -149,15 +117,6 @@ public sealed class UserManagementService
         return (true, $"Added '{role}' to {(user.Email ?? user.UserName)}.");
     }
 
-    /// <summary>
-    /// Remove role as an asynchronous operation.
-    /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="role">The role.</param>
-    /// <param name="currentUserId">The current user identifier.</param>
-    /// <param name="adminCount">The admin count.</param>
-    /// <param name="ct">The cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-    /// <returns>A Task&lt;System.ValueTuple&gt; representing the asynchronous operation.</returns>
     public async Task<(bool Ok, string Message)> RemoveRoleAsync(
         string userId,
         string role,
@@ -174,16 +133,13 @@ public sealed class UserManagementService
 
         if (role.Equals(Roles.Admin, StringComparison.OrdinalIgnoreCase))
         {
-            // Built-in admin can never lose Admin
             if (AdminSentinel.IsProtectedAdmin(user.Email, m_Config))
                 return (false, $"You cannot remove Admin from the built-in admin account ({AdminSentinel.GetProtectedAdminEmail(m_Config)}).");
 
-            // Admin cannot remove Admin from themselves
             if (!string.IsNullOrWhiteSpace(currentUserId) &&
                 string.Equals(currentUserId, userId, StringComparison.Ordinal))
                 return (false, "You cannot remove Admin from yourself.");
 
-            // Never remove the last admin
             if (adminCount <= 1)
                 return (false, "You must have at least one Admin account.");
         }
@@ -205,7 +161,6 @@ public sealed class UserManagementService
         if (user is null)
             return (false, "User not found.");
 
-        // Optional: don’t allow suspending protected admin (recommended)
         if (AdminSentinel.IsProtectedAdmin(user.Email, m_Config))
             return (false, "You cannot suspend the built-in admin account.");
 
@@ -229,10 +184,8 @@ public sealed class UserManagementService
         if (!result.Succeeded)
             return (false, string.Join(" | ", result.Errors.Select(e => e.Description)));
 
-        // Optional, but nice:
         await m_UserManager.ResetAccessFailedCountAsync(user);
 
         return (true, $"Unsuspended {(user.Email ?? user.UserName)}.");
     }
-
 }
