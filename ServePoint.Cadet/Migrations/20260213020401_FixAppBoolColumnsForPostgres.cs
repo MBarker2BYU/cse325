@@ -23,6 +23,10 @@ namespace ServePoint.Cadet.Migrations
                                          ALTER TABLE "VolunteerSignups"
                                          ALTER COLUMN "AttendanceApproved" TYPE boolean
                                          USING (COALESCE("AttendanceApproved", 0) <> 0);
+                                         
+                                         ALTER TABLE "VolunteerSignups"
+                                         ALTER COLUMN "AttendanceSubmitted" TYPE boolean
+                                         USING (COALESCE("AttendanceSubmitted", 0) <> 0);
                                      """);
             }
         }
@@ -43,6 +47,10 @@ namespace ServePoint.Cadet.Migrations
                                          ALTER TABLE "VolunteerSignups"
                                          ALTER COLUMN "AttendanceApproved" TYPE integer
                                          USING (CASE WHEN "AttendanceApproved" THEN 1 ELSE 0 END);
+                                         
+                                         ALTER TABLE "VolunteerSignups"
+                                         ALTER COLUMN "AttendanceSubmitted" TYPE integer
+                                         USING (CASE WHEN "AttendanceSubmitted" THEN 1 ELSE 0 END);
                                      """);
             }
         }
