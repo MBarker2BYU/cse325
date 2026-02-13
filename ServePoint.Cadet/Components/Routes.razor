@@ -1,10 +1,11 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
-@using ServePoint.Cadet.Components.Account.Shared
+﻿@using ServePoint.Cadet.Components.Account.Shared
 
-<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+<Router AppAssembly="@typeof(Program).Assembly"
+        NotFoundPage="@typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
-            <NotAuthorized Context="authState">
+        <AuthorizeRouteView RouteData="@routeData"
+                            DefaultLayout="@typeof(Layout.MainLayout)">
+            <NotAuthorized Context="routeAuth">
                 <AuthorizeView>
                     <Authorized>
                         <RedirectToAccessDenied />
@@ -16,6 +17,6 @@
             </NotAuthorized>
         </AuthorizeRouteView>
 
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
 </Router>

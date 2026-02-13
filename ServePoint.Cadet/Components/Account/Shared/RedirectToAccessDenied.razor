@@ -3,8 +3,8 @@
 @code {
     protected override void OnInitialized()
     {
-        Nav.NavigateTo("/access-denied");
-        // If prod still acts flaky, use a hard reload:
-        // Nav.NavigateTo("/access-denied", forceLoad: true);
+        Nav.NavigateTo("/Account/AccessDenied");
+        // If prod still acts weird:
+        // Nav.NavigateTo("/Account/AccessDenied", forceLoad: true);
     }
 }
