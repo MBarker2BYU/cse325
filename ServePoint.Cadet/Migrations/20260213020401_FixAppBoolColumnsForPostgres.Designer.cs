@@ -11,7 +11,7 @@ using ServePoint.Cadet.Data;
 namespace ServePoint.Cadet.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260213015333_FixAppBoolColumnsForPostgres")]
+    [Migration("20260213020401_FixAppBoolColumnsForPostgres")]
     partial class FixAppBoolColumnsForPostgres
     {
         /// <inheritdoc />
