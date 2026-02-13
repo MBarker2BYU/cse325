@@ -26,14 +26,19 @@ builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuth
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
 
+// DO NOT USE IN APP EVER!!! Use DbGateway for data access.
 builder.Services.AddDbContext<ApplicationDbContext>(
     options => options.UseNpgsql(connectionString),
     contextLifetime: ServiceLifetime.Scoped,
     optionsLifetime: ServiceLifetime.Singleton
 );
 
+// DO NOT USE IN APP EVER!!! Use DbGateway for data access.
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// Use this for Data
+builder.Services.AddScoped<DbGateway>();
 
 // Identity
 builder.Services
@@ -113,7 +118,20 @@ else
     app.UseHsts();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+app.UseStatusCodePages(async context =>
+{
+    var http = context.HttpContext;
+
+    if (http.Response.StatusCode == 404 &&
+        HttpMethods.IsGet(http.Request.Method))
+    {
+        http.Response.Redirect("/not-found");
+    }
+
+    await Task.CompletedTask;
+});
+
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 

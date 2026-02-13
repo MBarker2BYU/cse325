@@ -4,15 +4,8 @@ using ServePoint.Cadet.Models.Entities;
 
 namespace ServePoint.Cadet.Data.Services;
 
-public sealed class DashboardService
+public sealed class DashboardService(IDbContextFactory<ApplicationDbContext> dbFactory)
 {
-    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
-
-    public DashboardService(IDbContextFactory<ApplicationDbContext> dbFactory)
-    {
-        _dbFactory = dbFactory;
-    }
-
     public sealed record ActorContext(
         string UserId,
         bool IsUser,
@@ -36,7 +29,7 @@ public sealed class DashboardService
 
     public async Task<DashboardData> LoadAsync(ActorContext actor, CancellationToken ct = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         // My signups (always)
         var mySignups = await db.VolunteerSignups
@@ -101,7 +94,7 @@ public sealed class DashboardService
 
     public async Task<(bool ok, string? error)> SubmitAttendanceAsync(string userId, int signupId, CancellationToken ct = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var signup = await db.VolunteerSignups
             .Include(s => s.VolunteerOpportunity)
@@ -129,7 +122,7 @@ public sealed class DashboardService
     {
         if (!actor.CanApprove) return (false, "Not authorized.");
 
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var signup = await db.VolunteerSignups
             .FirstOrDefaultAsync(s => s.Id == signupId, ct);
@@ -150,7 +143,7 @@ public sealed class DashboardService
     {
         if (!actor.CanApprove) return (false, "Not authorized.");
 
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var signup = await db.VolunteerSignups
             .FirstOrDefaultAsync(s => s.Id == signupId, ct);
@@ -171,7 +164,7 @@ public sealed class DashboardService
 
     public async Task<(bool ok, string? error)> WithdrawAsync(string userId, int signupId, CancellationToken ct = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var signup = await db.VolunteerSignups
             .Include(s => s.VolunteerOpportunity)

@@ -23,7 +23,7 @@ namespace ServePoint.Cadet.Data.Services;
 /// </summary>
 public sealed class UserManagementService
 {
-    private readonly IDbContextFactory<ApplicationDbContext> m_DbFactory;
+    private readonly DbGateway m_Db;
     private readonly UserManager<ApplicationUser> m_UserManager;
     private readonly RoleManager<IdentityRole> m_RoleManager;
     private readonly IConfiguration m_Config;
@@ -32,12 +32,12 @@ public sealed class UserManagementService
     /// Initializes a new instance of the <see cref="UserManagementService"/> class.
     /// </summary>
     public UserManagementService(
-        IDbContextFactory<ApplicationDbContext> dbFactory,
+        DbGateway db,
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager,
         IConfiguration config)
     {
-        m_DbFactory = dbFactory;
+        m_Db = db;
         m_UserManager = userManager;
         m_RoleManager = roleManager;
         m_Config = config;
@@ -52,50 +52,70 @@ public sealed class UserManagementService
 
     /// <summary>
     /// Load as an asynchronous operation.
+    /// IMPORTANT: do NOT use UserManager.Users / GetUsersInRoleAsync here.
+    /// Use DbGateway so every call gets a fresh DbContext (prevents concurrency issues in Blazor Server).
     /// </summary>
-    public async Task<(List<UserRow> Rows, string? CurrentUserId, string ProtectedAdminEmail, int AdminCount)> LoadAsync(
+    public Task<(List<UserRow> Rows, string? CurrentUserId, string ProtectedAdminEmail, int AdminCount)> LoadAsync(
         string? currentUserId,
         CancellationToken ct = default)
     {
         var protectedAdminEmail = AdminSentinel.GetProtectedAdminEmail(m_Config);
 
-        // Count admins once (used for "last admin" rule)
-        var adminCount = (await m_UserManager.GetUsersInRoleAsync(Roles.Admin)).Count;
-
-        // Materialize users list (safe)
-        var users = await m_UserManager.Users
-            .AsNoTracking()
-            .OrderBy(u => u.Email)
-            .Select(u => new { u.Id, u.Email, u.UserName, u.LockoutEnd })
-            .ToListAsync(ct);
-
-        // Pull role mappings via a fresh DbContext (prevents "second operation on this context" issues)
-        await using var db = await m_DbFactory.CreateDbContextAsync(ct);
-
-        var userRoles = await (
-            from ur in db.UserRoles
-            join r in db.Roles on ur.RoleId equals r.Id
-            select new { ur.UserId, RoleName = r.Name! }
-        ).AsNoTracking().ToListAsync(ct);
-
-        var roleLookup = userRoles
-            .GroupBy(x => x.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).ToList());
-
-        var rows = new List<UserRow>(users.Count);
-        foreach (var u in users)
+        return m_Db.ExecuteAsync(async db =>
         {
-            roleLookup.TryGetValue(u.Id, out var roles);
+            // Resolve Admin role id (if it doesn't exist yet, count=0)
+            var adminRoleId = await db.Roles
+                .AsNoTracking()
+                .Where(r => r.Name == Roles.Admin)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync(ct);
 
-            rows.Add(new UserRow(
-                u.Id,
-                u.Email,
-                u.UserName,
-                roles ?? [],
-                u.LockoutEnd));
-        }
+            // Count admins using UserRoles (no Identity store reads)
+            var adminCount = string.IsNullOrWhiteSpace(adminRoleId)
+                ? 0
+                : await db.UserRoles
+                    .AsNoTracking()
+                    .CountAsync(ur => ur.RoleId == adminRoleId, ct);
 
-        return (rows, currentUserId, protectedAdminEmail, adminCount);
+            // Load users
+            var users = await db.Users
+                .AsNoTracking()
+                .OrderBy(u => u.Email)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Email,
+                    u.UserName,
+                    u.LockoutEnd
+                })
+                .ToListAsync(ct);
+
+            // Load role mappings (UserId -> [RoleName])
+            var userRoles = await (
+                from ur in db.UserRoles.AsNoTracking()
+                join r in db.Roles.AsNoTracking() on ur.RoleId equals r.Id
+                select new { ur.UserId, RoleName = r.Name! }
+            ).ToListAsync(ct);
+
+            var roleLookup = userRoles
+                .GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).ToList());
+
+            var rows = new List<UserRow>(users.Count);
+            foreach (var u in users)
+            {
+                roleLookup.TryGetValue(u.Id, out var roles);
+
+                rows.Add(new UserRow(
+                    u.Id,
+                    u.Email,
+                    u.UserName,
+                    roles ?? [],
+                    u.LockoutEnd));
+            }
+
+            return (rows, currentUserId, protectedAdminEmail, adminCount);
+        }, ct);
     }
 
     public async Task<(bool Ok, string Message)> AddRoleAsync(string userId, string role, CancellationToken ct = default)
