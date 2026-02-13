@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics; // ✅ ADD THIS
 using ServePoint.Cadet.Components;
 using ServePoint.Cadet.Components.Account;
 using ServePoint.Cadet.Data;
@@ -23,9 +24,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     if (builder.Environment.IsDevelopment())
+    {
         options.UseSqlite(connectionString);
+    }
     else
-        options.UseNpgsql(connectionString); // o NOT override migrations assembly
+    {
+        options.UseNpgsql(connectionString);
+
+        // ✅ Render: don't crash on this warning during MigrateAsync()
+        options.ConfigureWarnings(w =>
+            w.Ignore(RelationalEventId.PendingModelChangesWarning));
+    }
 });
 
 builder.Services
