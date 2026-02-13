@@ -13,6 +13,7 @@
 // ***********************************************************************
 
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using ServePoint.Cadet.Auth;
 
 namespace ServePoint.Cadet.Data.Initialization;
@@ -32,8 +33,10 @@ public static class InitializeDefaultUserRole
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
+        var users = await userManager.Users.AsNoTracking().ToListAsync();
+
         // Enumerate users directly from the store (safe for SQLite/Postgres)
-        foreach (var user in userManager.Users)
+        foreach (var user in users)
         {
             var roles = await userManager.GetRolesAsync(user);
 
