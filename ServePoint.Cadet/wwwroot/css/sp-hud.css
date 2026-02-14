@@ -815,3 +815,8 @@ input.input-validation-error {
 .hud-muted-text {
     color: var(--muted-teal-white-green);
 }
+
+.sp-nav-toggle
+{
+    display: none !important; 
+}
