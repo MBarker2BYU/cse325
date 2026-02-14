@@ -132,7 +132,11 @@ app.UseStatusCodePages(async context =>
     await Task.CompletedTask;
 });
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
