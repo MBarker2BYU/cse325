@@ -62,12 +62,16 @@ builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 
-
 //Production Issues
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+var options = new ForwardedHeadersOptions()
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+};
+
+options.KnownProxies.Clear();
+options.KnownIPNetworks.Clear();
+
+app.UseForwardedHeaders(options);
 
 // Capture unhandled exceptions (REMOVE after fixing)
 app.Use(async (ctx, next) =>
@@ -100,12 +104,6 @@ app.MapGet("/_diag/last-error", () =>
     return Results.Text(sb.ToString(), "text/plain");
 });
 
-// Render reverse proxy (fixes auth/cookie/redirect issues behind TLS termination)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
-
 
 // Pipeline
 if (app.Environment.IsDevelopment())
@@ -132,11 +130,7 @@ app.UseStatusCodePages(async context =>
     await Task.CompletedTask;
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
-
+app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
