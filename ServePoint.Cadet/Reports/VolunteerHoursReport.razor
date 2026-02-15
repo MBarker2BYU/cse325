@@ -1,0 +1,219 @@
+﻿@page "/reports/hours"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.JSInterop
+@using ServePoint.Cadet.Auth
+@using ServePoint.Cadet.Data
+@using ServePoint.Cadet.Reports.Services
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject VolunteerHoursReportService Report
+@inject IJSRuntime Js
+
+<PageTitle>Volunteer Hours Report</PageTitle>
+
+<div class="d-print-none mb-3">
+    <h2>Volunteer Hours Report</h2>
+
+    <div class="row g-2 align-items-end">
+        @if (m_CanRunForOthers)
+        {
+            <div class="col-md-4">
+                <label class="form-label">Cadet</label>
+                <select class="form-select" @bind="m_SelectedUserId">
+                    @foreach (var u in m_Cadets)
+                    {
+                        <option value="@u.Id">@u.Display</option>
+                    }
+                </select>
+            </div>
+        }
+
+        <div class="col-md-3">
+            <label class="form-label">From</label>
+            <InputDate @bind-Value="m_From" class="form-control" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">To</label>
+            <InputDate @bind-Value="m_To" class="form-control" />
+        </div>
+
+        <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="Load">Run</button>
+
+            <!-- DO NOT inline JS with quotes inside quotes -->
+            <button class="btn btn-outline-secondary" @onclick="Print">
+                Print
+            </button>
+
+            <button class="btn btn-outline-success"
+                    @onclick="ExportCsv"
+                    disabled="@(m_Rows.Count == 0)">
+                CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (m_Loading)
+{
+    <p>Loading…</p>
+}
+else if (m_Rows.Count == 0)
+{
+    <p>No records found for the selected range.</p>
+}
+else
+{
+    <div class="report">
+        <h1 class="m-0">ServePoint Volunteer Hours Report</h1>
+        <div class="small text-muted">
+            Cadet: @m_HeaderName (@m_HeaderEmail) <br />
+            Range: @m_From?.ToString("yyyy-MM-dd") – @m_To?.ToString("yyyy-MM-dd") <br />
+            Generated: @DateTime.Now.ToString("yyyy-MM-dd HH:mm")
+        </div>
+
+        <hr />
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Opportunity</th>
+                    <th class="text-end">Hours</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in m_Rows)
+                {
+                    <tr>
+                        <td>@r.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@r.Title</td>
+                        <td class="text-end">@r.Hours</td>
+                        <td>@r.Status</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2" class="text-end">Approved Total</th>
+                    <th class="text-end">@m_ApprovedTotal</th>
+                    <th></th>
+                </tr>
+                <tr>
+                    <th colspan="2" class="text-end">Pending Total</th>
+                    <th class="text-end">@m_PendingTotal</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+}
+
+@code {
+    private DateTime? m_From = DateTime.Today.AddMonths(-3);
+    private DateTime? m_To = DateTime.Today;
+
+    private bool m_Loading;
+    private bool m_CanRunForOthers;
+
+    private string? m_SelectedUserId;
+    private string m_HeaderName = "";
+    private string m_HeaderEmail = "";
+
+    // FIX: Remove ReportSvc.* and use the service’s types directly
+    private List<VolunteerHoursReportService.VolunteerHoursRow> m_Rows = new();
+    private int m_ApprovedTotal;
+    private int m_PendingTotal;
+
+    private List<VolunteerHoursReportService.CadetPick> m_Cadets = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthStateProvider.GetAuthenticationStateAsync()).User;
+        var me = user.FindFirstValue(ClaimTypes.NameIdentifier)
+                 ?? throw new InvalidOperationException("No user id.");
+
+        m_CanRunForOthers =
+            user.IsInRole(Roles.Instructor) || user.IsInRole(Roles.Admin);
+
+        if (m_CanRunForOthers)
+        {
+            m_Cadets = await Report.GetCadetPickerAsync();
+            m_SelectedUserId = m_Cadets.FirstOrDefault()?.Id ?? me;
+        }
+        else
+        {
+            m_SelectedUserId = me;
+        }
+
+        await Load();
+    }
+
+    private async Task Print()
+        => await Js.InvokeVoidAsync("window.print");
+
+    private async Task Load()
+    {
+        if (string.IsNullOrWhiteSpace(m_SelectedUserId))
+        {
+            m_Rows.Clear();
+            m_HeaderName = "";
+            m_HeaderEmail = "";
+            m_ApprovedTotal = 0;
+            m_PendingTotal = 0;
+            return;
+        }
+
+        m_Loading = true;
+        try
+        {
+            var user = (await AuthStateProvider.GetAuthenticationStateAsync()).User;
+            var requesterId = user.FindFirstValue(ClaimTypes.NameIdentifier)
+                             ?? throw new InvalidOperationException("No requester id.");
+
+            var result = await Report.GetReportAsync(
+                requesterId,
+                m_SelectedUserId,
+                m_From,
+                m_To);
+
+            m_HeaderName = result.HeaderName;
+            m_HeaderEmail = result.HeaderEmail;
+            m_Rows = result.Rows;
+
+            m_ApprovedTotal = result.ApprovedTotalHours;
+            m_PendingTotal = result.PendingTotalHours;
+        }
+        finally { m_Loading = false; }
+    }
+
+    private async Task ExportCsv()
+    {
+        var reportResult =
+            new VolunteerHoursReportService.VolunteerHoursReportResult(
+                m_HeaderName,
+                m_HeaderEmail,
+                m_ApprovedTotal,
+                m_PendingTotal,
+                m_Rows);
+
+        var bytes = Report.BuildCsvBytes(reportResult, m_From, m_To);
+
+        await Js.InvokeVoidAsync(
+            "spDownloadFile",
+            $"ServePointHours_{DateTime.Now:yyyyMMdd_HHmm}.csv",
+            "text/csv",
+            Convert.ToBase64String(bytes));
+    }
+}

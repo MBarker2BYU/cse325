@@ -98,7 +98,7 @@ else
     }
 
     @* ===== Available Opportunities (Users/Organizers only) ===== *@
-    @if (m_Data.Actor.AccruesHours)
+    @if (m_Data is not null && m_Data.Actor.AccruesHours)
     {
         <h2 class="h5 mt-4">Available Opportunities</h2>
 
@@ -159,7 +159,7 @@ else
         </div>
     </div>
 
-    @if (m_Data.MySignups.Count == 0)
+    @if (m_Data is not null && m_Data.MySignups.Count == 0)
     {
         <div class="alert alert-info">
             You don’t have any signups yet.

@@ -9,6 +9,7 @@ using ServePoint.Cadet.Data;
 using ServePoint.Cadet.Data.Initialization;
 using ServePoint.Cadet.Data.Services;
 using ServePoint.Cadet.Diagnostics;
+using ServePoint.Cadet.Reports.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,6 +73,8 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<OpportunityManagementService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<VolunteerHoursReportService>();
+
 
 var app = builder.Build();
 
