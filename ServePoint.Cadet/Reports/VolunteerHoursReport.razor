@@ -23,8 +23,8 @@
         @if (m_CanRunForOthers)
         {
             <div class="col-md-4">
-                <label class="form-label">Cadet</label>
-                <select class="form-select" @bind="m_SelectedUserId" disabled="@m_Loading">
+                <label class="form-label" for="cadetSelect">Cadet</label>
+                <select id="cadetSelect" class="form-select" @bind="m_SelectedUserId" disabled="@m_Loading">
                     @foreach (var u in m_Cadets)
                     {
                         <option value="@u.Id">@u.Display</option>
@@ -34,13 +34,13 @@
         }
 
         <div class="col-md-3">
-            <label class="form-label">From</label>
-            <InputDate @bind-Value="m_From" class="form-control" disabled="@m_Loading" />
+            <label class="form-label" for="fromDate">From</label>
+            <InputDate id="fromDate" @bind-Value="m_From" class="form-control" disabled="@m_Loading"  @attributes="m_FromAttributes"/>
         </div>
 
         <div class="col-md-3">
-            <label class="form-label">To</label>
-            <InputDate @bind-Value="m_To" class="form-control" disabled="@m_Loading" />
+            <label class="form-label" for="toDate">To</label>
+            <InputDate id="toDate" @bind-Value="m_To" class="form-control" disabled="@m_Loading"  @attributes="m_ToAttributes"/>
         </div>
 
         <div class="col-md-2 d-flex gap-2">
@@ -226,4 +226,15 @@ else
             "text/csv",
             Convert.ToBase64String(bytes));
     }
+
+    private readonly Dictionary<string, object> m_FromAttributes = new()
+    {
+        ["id"] = "fromDate"
+    };
+
+    private readonly Dictionary<string, object> m_ToAttributes = new()
+    {
+        ["id"] = "toDate"
+    };
+
 }
