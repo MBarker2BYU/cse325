@@ -1,13 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ServePoint.Cadet.Auth;
 using ServePoint.Cadet.Data;
 
 namespace ServePoint.Cadet.Reports.Services;
 
-public sealed class VolunteerHoursReportService(
-    DbGateway dbg,
-    UserManager<ApplicationUser> userManager)
+public sealed class VolunteerHoursReportService(DbGateway dbg)
 {
     // Instructor/Admin can pick any cadet (Users/Organizers).
     public Task<List<CadetPick>> GetCadetPickerAsync(CancellationToken ct = default)
@@ -30,39 +27,35 @@ public sealed class VolunteerHoursReportService(
                 .ToList();
         }, ct);
 
-    public async Task<VolunteerHoursReportResult> GetReportAsync(
+    public Task<VolunteerHoursReportResult> GetReportAsync(
         string requesterId,
         string targetUserId,
         DateTime? from,
         DateTime? to,
         CancellationToken ct = default)
-    {
-        // Authorization (same logic you already had)
-        var requester = await userManager.FindByIdAsync(requesterId)
-            ?? throw new InvalidOperationException("Requester not found.");
-
-        var requesterRoles = await userManager.GetRolesAsync(requester);
-        var canViewOthers =
-            requesterRoles.Contains(Roles.Instructor) || requesterRoles.Contains(Roles.Admin);
-
-        if (!canViewOthers && requesterId != targetUserId)
-            throw new UnauthorizedAccessException("Not allowed to view other users' reports.");
-
-        // Optional: if staff hours are N/A (per your policy), block staff reports for self.
-        // (You said Instructor/Admin do not accrue hours.)
-        // If you want hard-block:
-        // if ((requesterRoles.Contains(Roles.Instructor) || requesterRoles.Contains(Roles.Admin)) && requesterId == targetUserId)
-        //     return VolunteerHoursReportResult.EmptyStaff();
-
-        return await dbg.ExecuteAsync(async db =>
+        => dbg.ExecuteAsync(async db =>
         {
-            // Header
+            // ---- Authorization WITHOUT UserManager (avoids DbContext concurrency issues) ----
+            var requesterRoleNames =
+                from ur in db.UserRoles
+                join r in db.Roles on ur.RoleId equals r.Id
+                where ur.UserId == requesterId
+                select r.Name!;
+
+            var roles = await requesterRoleNames.ToListAsync(ct);
+
+            var canViewOthers = roles.Contains(Roles.Instructor) || roles.Contains(Roles.Admin);
+
+            if (!canViewOthers && requesterId != targetUserId)
+                throw new UnauthorizedAccessException("Not allowed to view other users' reports.");
+
+            // ---- Header ----
             var target = await db.Users
                 .Where(u => u.Id == targetUserId)
                 .Select(u => new { u.UserName, u.Email })
                 .SingleAsync(ct);
 
-            // Base query: signups for this user + opportunity info
+            // ---- Base query: signups for this user + opportunity info ----
             var q =
                 from s in db.VolunteerSignups.AsNoTracking()
                 join o in db.VolunteerOpportunities.AsNoTracking()
@@ -70,6 +63,7 @@ public sealed class VolunteerHoursReportService(
                 where s.UserId == targetUserId
                 select new { s, o };
 
+            // Normalize filters to UTC (Postgres timestamptz expects UTC with Npgsql)
             static DateTime AsUtcDate(DateTime dt)
                 => DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
 
@@ -86,8 +80,7 @@ public sealed class VolunteerHoursReportService(
                 q = q.Where(x => x.o.Date <= t);
             }
 
-
-            // Rows
+            // ---- Rows ----
             var rows = await q
                 .OrderByDescending(x => x.o.Date)
                 .Select(x => new VolunteerHoursRow(
@@ -100,7 +93,7 @@ public sealed class VolunteerHoursReportService(
                 ))
                 .ToListAsync(ct);
 
-            // Totals (hours-based)
+            // ---- Totals ----
             var approvedTotal = rows.Where(r => r.Status == "Approved").Sum(r => r.Hours);
             var pendingTotal = rows.Where(r => r.Status == "Pending").Sum(r => r.Hours);
 
@@ -112,7 +105,6 @@ public sealed class VolunteerHoursReportService(
                 Rows: rows
             );
         }, ct);
-    }
 
     public byte[] BuildCsvBytes(
         VolunteerHoursReportResult report,

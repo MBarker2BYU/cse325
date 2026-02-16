@@ -1,5 +1,4 @@
 ﻿@page "/reports/hours"
-@rendermode InteractiveServer
 @attribute [Authorize]
 
 @using System.Security.Claims
@@ -7,14 +6,11 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
-@using Microsoft.AspNetCore.Identity
 @using Microsoft.JSInterop
 @using ServePoint.Cadet.Auth
-@using ServePoint.Cadet.Data
 @using ServePoint.Cadet.Reports.Services
 
 @inject AuthenticationStateProvider AuthStateProvider
-@inject UserManager<ApplicationUser> UserManager
 @inject VolunteerHoursReportService Report
 @inject IJSRuntime Js
 
@@ -28,7 +24,7 @@
         {
             <div class="col-md-4">
                 <label class="form-label">Cadet</label>
-                <select class="form-select" @bind="m_SelectedUserId">
+                <select class="form-select" @bind="m_SelectedUserId" disabled="@m_Loading">
                     @foreach (var u in m_Cadets)
                     {
                         <option value="@u.Id">@u.Display</option>
@@ -39,25 +35,24 @@
 
         <div class="col-md-3">
             <label class="form-label">From</label>
-            <InputDate @bind-Value="m_From" class="form-control" />
+            <InputDate @bind-Value="m_From" class="form-control" disabled="@m_Loading" />
         </div>
 
         <div class="col-md-3">
             <label class="form-label">To</label>
-            <InputDate @bind-Value="m_To" class="form-control" />
+            <InputDate @bind-Value="m_To" class="form-control" disabled="@m_Loading" />
         </div>
 
         <div class="col-md-2 d-flex gap-2">
-            <button class="btn btn-primary" @onclick="Load">Run</button>
+            <button class="btn btn-primary" @onclick="Load" disabled="@m_Loading">Run</button>
 
-            <!-- DO NOT inline JS with quotes inside quotes -->
-            <button class="btn btn-outline-secondary" @onclick="Print">
+            <button class="btn btn-outline-secondary" @onclick="Print" disabled="@m_Loading">
                 Print
             </button>
 
             <button class="btn btn-outline-success"
                     @onclick="ExportCsv"
-                    disabled="@(m_Rows.Count == 0)">
+                    disabled="@(m_Loading || m_Rows.Count == 0)">
                 CSV
             </button>
         </div>
@@ -121,8 +116,9 @@ else
 }
 
 @code {
-    private DateTime? m_From = DateTime.Today.AddMonths(-3);
-    private DateTime? m_To = DateTime.Today;
+    // Use UTC dates to avoid Postgres timestamptz issues
+    private DateTime? m_From = DateTime.UtcNow.Date.AddMonths(-3);
+    private DateTime? m_To = DateTime.UtcNow.Date;
 
     private bool m_Loading;
     private bool m_CanRunForOthers;
@@ -131,12 +127,14 @@ else
     private string m_HeaderName = "";
     private string m_HeaderEmail = "";
 
-    // FIX: Remove ReportSvc.* and use the service’s types directly
     private List<VolunteerHoursReportService.VolunteerHoursRow> m_Rows = new();
     private int m_ApprovedTotal;
     private int m_PendingTotal;
 
     private List<VolunteerHoursReportService.CadetPick> m_Cadets = new();
+
+    // Prevent double-fire / concurrent loads (Blazor render + click, etc.)
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -161,23 +159,31 @@ else
     }
 
     private async Task Print()
-        => await Js.InvokeVoidAsync("window.print");
+    {
+        // simplest reliable call
+        await Js.InvokeVoidAsync("window.print");
+    }
 
     private async Task Load()
     {
-        if (string.IsNullOrWhiteSpace(m_SelectedUserId))
-        {
-            m_Rows.Clear();
-            m_HeaderName = "";
-            m_HeaderEmail = "";
-            m_ApprovedTotal = 0;
-            m_PendingTotal = 0;
+        // non-reentrant
+        if (!await _loadGate.WaitAsync(0))
             return;
-        }
 
-        m_Loading = true;
         try
         {
+            if (string.IsNullOrWhiteSpace(m_SelectedUserId))
+            {
+                m_Rows.Clear();
+                m_HeaderName = "";
+                m_HeaderEmail = "";
+                m_ApprovedTotal = 0;
+                m_PendingTotal = 0;
+                return;
+            }
+
+            m_Loading = true;
+
             var user = (await AuthStateProvider.GetAuthenticationStateAsync()).User;
             var requesterId = user.FindFirstValue(ClaimTypes.NameIdentifier)
                              ?? throw new InvalidOperationException("No requester id.");
@@ -195,7 +201,11 @@ else
             m_ApprovedTotal = result.ApprovedTotalHours;
             m_PendingTotal = result.PendingTotalHours;
         }
-        finally { m_Loading = false; }
+        finally
+        {
+            m_Loading = false;
+            _loadGate.Release();
+        }
     }
 
     private async Task ExportCsv()
