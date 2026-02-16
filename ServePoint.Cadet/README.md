@@ -101,12 +101,22 @@ UI rendering and business logic are enforced through role policies to ensure sec
 
 ### Performance
 
-Validated using Google Lighthouse on production deployment.
+ServePoint was evaluated using Google Lighthouse on the production deployment to ensure realistic network and rendering conditions.
 
-- Performance scores: 99–100
-- Total Blocking Time: 0ms
-- Cumulative Layout Shift: 0
-- Optimized database access using Entity Framework Core
+### Lighthouse Results
+
+| Page | Performance | Accessibility | Best Practices | SEO |
+|------|------------|--------------|----------------|-----|
+| Dashboard | 100 | 100 | 100 | 83 |
+| Opportunities | 100 | 100 | 100 | 83 |
+| User Management | 100 | 94–100 | 100 | 83 |
+| Reporting | 99 | 100 | 77–96 | 83 |
+| Login | 100 | 100 | 96 | 82 |
+
+- Total Blocking Time: 0ms  
+- Cumulative Layout Shift: 0  
+- Optimized data access via Entity Framework Core  
+- Minimal unnecessary network requests
 
 ### Accessibility (WCAG 2.1 Level AA Alignment)
 
@@ -131,6 +141,32 @@ Accessibility considerations include:
 - CSS validation via Chrome DevTools
 - Manual functional testing across all roles
 
+## Screenshots
+
+Images are located in the `/docs` directory of the repository.
+
+### Login
+![Login](docs/Login.png)
+
+### Dashboard
+![Dashboard](docs/Dashboard.png)
+
+### Mobile Dashboard
+![Mobile Dashboard](docs/Mobile-Dashboard.png)
+
+### Opportunity Management
+![Opportunity Management](docs/Opportunity-Management.png)
+
+### User Management
+![User Management](docs/User-Management.png)
+
+### Volunteer Report (Desktop)
+![Printing](docs/Printing.png)
+
+### Volunteer Report (Mobile)
+![Mobile Print](docs/Mobile-Print.png)
+
+- 
 ---
 
 ## Navigation Structure
