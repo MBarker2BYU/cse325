@@ -56,12 +56,23 @@ public sealed class VolunteerHoursReportService(DbGateway dbg)
                 .SingleAsync(ct);
 
             // ---- Base query: signups for this user + opportunity info ----
+            //var q =
+            //    from s in db.VolunteerSignups.AsNoTracking()
+            //    join o in db.VolunteerOpportunities.AsNoTracking()
+            //        on s.VolunteerOpportunityId equals o.Id
+            //    where s.UserId == targetUserId
+            //    select new { s, o };
+
+            // ---- Base query: signups for this user + opportunity info ----
+            // Rule: do NOT include deleted opportunities UNLESS attendance was approved.
             var q =
                 from s in db.VolunteerSignups.AsNoTracking()
                 join o in db.VolunteerOpportunities.AsNoTracking()
                     on s.VolunteerOpportunityId equals o.Id
                 where s.UserId == targetUserId
+                      && (o.DeletedAt == null || s.AttendanceApproved)
                 select new { s, o };
+
 
             // Normalize filters to UTC (Postgres timestamptz expects UTC with Npgsql)
             static DateTime AsUtcDate(DateTime dt)
@@ -85,12 +96,13 @@ public sealed class VolunteerHoursReportService(DbGateway dbg)
                 .OrderByDescending(x => x.o.Date)
                 .Select(x => new VolunteerHoursRow(
                     Date: x.o.Date,
-                    Title: x.o.Title,
+                    Title: x.o.DeletedAt == null ? x.o.Title : $"{x.o.Title} (Deleted)",
                     Hours: x.o.Hours,
                     Status: x.s.AttendanceApproved
                         ? "Approved"
                         : x.s.AttendanceSubmitted ? "Pending" : "Signed Up"
                 ))
+
                 .ToListAsync(ct);
 
             // ---- Totals ----
@@ -127,6 +139,9 @@ public sealed class VolunteerHoursReportService(DbGateway dbg)
         sb.AppendLine($"To,{to:yyyy-MM-dd}");
         sb.AppendLine();
         sb.AppendLine("Date,Opportunity,Hours,Status");
+
+        //foreach (var r in report.Rows)
+        //    sb.AppendLine($"{r.Date:yyyy-MM-dd},{Esc(r.Title)},{r.Hours},{Esc(r.Status)}");
 
         foreach (var r in report.Rows)
             sb.AppendLine($"{r.Date:yyyy-MM-dd},{Esc(r.Title)},{r.Hours},{Esc(r.Status)}");

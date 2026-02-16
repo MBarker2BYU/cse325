@@ -58,16 +58,17 @@ else
                     </div>
                 </div>
             </div>
-        }
 
-        <div class="col-md-4">
-            <div class="card sp-card shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Upcoming Signups</div>
-                    <div class="display-6">@m_Data.UpcomingSignedUpCount</div>
+            <div class="col-md-4">
+                <div class="card sp-card shadow-sm">
+                    <div class="card-body">
+                        <div class="text-muted small">Upcoming Signups</div>
+                        <div class="display-6">@m_Data.UpcomingSignedUpCount</div>
+                    </div>
                 </div>
             </div>
-        </div>
+        }
+        
     </div>
 
     @* ===== Progress (Users/Organizers only) ===== *@
@@ -114,63 +115,63 @@ else
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle">
                         <thead>
-                            <tr>
-                                <th style="width: 34%">Title</th>
-                                <th style="width: 14%">Date</th>
-                                <th style="width: 10%">Hours</th>
-                                <th style="width: 26%">Contact</th>
-                                <th style="width: 16%">City</th>
-                                <th class="text-end" style="width: 10%">Action</th>
-                            </tr>
+                        <tr>
+                            <th style="width: 34%">Title</th>
+                            <th style="width: 14%">Date</th>
+                            <th style="width: 10%">Hours</th>
+                            <th style="width: 26%">Contact</th>
+                            <th style="width: 16%">City</th>
+                            <th class="text-end" style="width: 10%">Action</th>
+                        </tr>
                         </thead>
                         <tbody>
-                            @foreach (var o in m_Available)
-                            {
-                                <tr>
-                                    <td class="fw-semibold">@o.Title</td>
-                                    <td>@o.Date.ToShortDateString()</td>
-                                    <td>@o.Hours</td>
-                                    <td>@o.Contact?.Name</td>
-                                    <td class="text-muted">@o.Contact?.Address?.City</td>
-                                    <td class="text-end text-nowrap">
-                                        <button class="btn btn-sm btn-primary"
-                                                disabled="@m_Busy"
-                                                @onclick="() => Signup(o.Id)">
-                                            Sign Up
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
+                        @foreach (var o in m_Available)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@o.Title</td>
+                                <td>@o.Date.ToShortDateString()</td>
+                                <td>@o.Hours</td>
+                                <td>@o.Contact?.Name</td>
+                                <td class="text-muted">@o.Contact?.Address?.City</td>
+                                <td class="text-end text-nowrap">
+                                    <button class="btn btn-sm btn-primary"
+                                            disabled="@m_Busy"
+                                            @onclick="() => Signup(o.Id)">
+                                        Sign Up
+                                    </button>
+                                </td>
+                            </tr>
+                        }
                         </tbody>
                     </table>
                 </div>
             </div>
         }
-    }
 
-    @* ===== My Signups ===== *@
-    <div class="d-flex align-items-center justify-content-between mb-2">
-        <h2 class="h5 mb-0">My Signups</h2>
 
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@m_Busy">
-                Refresh
-            </button>
+        @* ===== My Signups ===== *@
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h2 class="h5 mb-0">My Signups</h2>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@m_Busy">
+                    Refresh
+                </button>
+            </div>
         </div>
-    </div>
 
-    @if (m_Data is not null && m_Data.MySignups.Count == 0)
-    {
-        <div class="alert alert-info">
-            You don’t have any signups yet.
-        </div>
-    }
-    else
-    {
-        <div class="sp-table-shell">
-            <div class="table-responsive">
-                <table class="table table-hover table-sm align-middle">
-                    <thead>
+        @if (m_Data is not null && m_Data.MySignups.Count == 0)
+        {
+            <div class="alert alert-info">
+                You don’t have any signups yet.
+            </div>
+        }
+        else
+        {
+            <div class="sp-table-shell">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead>
                         <tr>
                             <th style="width: 28%">Opportunity</th>
                             <th style="width: 14%">Date</th>
@@ -179,8 +180,8 @@ else
                             <th style="width: 22%">Contact</th>
                             <th class="text-end" style="width: 12%">Actions</th>
                         </tr>
-                    </thead>
-                    <tbody>
+                        </thead>
+                        <tbody>
                         @foreach (var s in m_Data.MySignups)
                         {
                             var opp = s.VolunteerOpportunity;
@@ -260,10 +261,11 @@ else
                                 </td>
                             </tr>
                         }
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        }
     }
 
     @* ===== Instructor/Admin Approval Queue ===== *@

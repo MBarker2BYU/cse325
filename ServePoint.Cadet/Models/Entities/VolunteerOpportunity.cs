@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ServePoint.Cadet.Models.Entities;
 
@@ -46,8 +47,13 @@ public class VolunteerOpportunity
 
     public DateTime? ApprovedAt { get; set; }
 
-    public bool IsDeletionRequested { get; set; }
-    public DateTime? DeletionRequestedAt { get; set; }
-    public string? DeletionRequestedByUserId { get; set; }
+    [Column("IsDeletionRequested")]
+    public bool IsDeleted { get; set; }
+
+    [Column("DeletionRequestedAt")]
+    public DateTime? DeletedAt { get; set; }
+
+    [Column("DeletionRequestedByUserId")]
+    public string? DeletedByUserId { get; set; }
 
 }

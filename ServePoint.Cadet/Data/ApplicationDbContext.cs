@@ -40,7 +40,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.IsApproved)
                 .HasConversion(boolToInt);
 
-            entity.Property(x => x.IsDeletionRequested)
+            entity.Property(x => x.IsDeleted)
                 .HasConversion(boolToInt);
         });
 

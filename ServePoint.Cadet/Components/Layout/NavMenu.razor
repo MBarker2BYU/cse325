@@ -45,7 +45,7 @@
                 
             </AuthorizeView>
             
-            <AuthorizeView Roles="@($"{Roles.Instructor},{Roles.Admin}")">
+            <AuthorizeView Roles="@($"{Roles.Admin}")">
 
                 <Authorized>
                     <NavLink class="nav-link sp-nav-link" href="/admin/users">

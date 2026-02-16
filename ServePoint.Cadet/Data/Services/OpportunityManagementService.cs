@@ -53,7 +53,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
     }
 
     // ===== Date/Time helpers =====
-    // PostgreSQL "timestamptz" requires UTC DateTime values in Npgsql.
+    // PostgreSQL "time stamp tz" requires UTC DateTime values in Npgsql.
     // Treat the event "Date" as a date-only concept stored as UTC midnight.
     private static DateTime NormalizeEventDateUtc(DateTime date)
         => DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
@@ -89,6 +89,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
                 .AsNoTracking()
                 .Include(o => o.Contact)
                 .ThenInclude(c => c.Address)
+                .Where(o => o.DeletedAt == null)   //Exclude deleted
                 .OrderByDescending(o => o.Date)
                 .ToListAsync(ct);
 
@@ -163,7 +164,9 @@ public sealed class OpportunityManagementService(DbGateway dbg)
                 .AsNoTracking()
                 .Include(o => o.Contact)
                 .ThenInclude(c => c.Address)
+                .Where(o => o.DeletedAt == null)   // Exclude deleted
                 .FirstOrDefaultAsync(o => o.Id == id, ct);
+
 
             if (existing is null)
                 return (false, "Opportunity not found.", null);
@@ -212,10 +215,17 @@ public sealed class OpportunityManagementService(DbGateway dbg)
 
         return await dbg.ExecuteAsync(async db =>
         {
+            //var existing = await db.VolunteerOpportunities
+            //    .Include(o => o.Contact)
+            //    .ThenInclude(c => c.Address)
+            //    .FirstOrDefaultAsync(o => o.Id == input.Id, ct);
+
             var existing = await db.VolunteerOpportunities
                 .Include(o => o.Contact)
                 .ThenInclude(c => c.Address)
+                .Where(o => o.DeletedAt == null)   // Exclude deleted
                 .FirstOrDefaultAsync(o => o.Id == input.Id, ct);
+
 
             if (existing is null)
                 return (false, "Opportunity not found.");
@@ -284,10 +294,17 @@ public sealed class OpportunityManagementService(DbGateway dbg)
         }, ct);
     }
 
+    /// <summary>
+    /// Deletes the asynchronous. This is a soft delete that can only be access by instructors  and Admin roles.
+    /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="actor">The actor.</param>
+    /// <param name="ct">The cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+    /// <returns>System.Threading.Tasks.Task{(bool ok, string message)}.</returns>
     public Task<(bool ok, string message)> DeleteAsync(int id, ActorContext actor, CancellationToken ct = default)
         => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
         {
-            if (!actor.CanManage)
+            if (!actor.AutoApprove)
                 return (false, "Not authorized.");
 
             var existing = await db.VolunteerOpportunities
@@ -296,34 +313,16 @@ public sealed class OpportunityManagementService(DbGateway dbg)
             if (existing is null)
                 return (false, "Opportunity not found.");
 
-            if (HasEnded(existing))
-                return (false, "This opportunity has already ended and can no longer be deleted.");
+            if (existing.DeletedAt != null)
+                return (true, "Already deleted.");
 
-            var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
-            if (organizerOnly && existing.Date.Date == DateTime.UtcNow.Date)
-                return (false, "Organizers can only delete opportunities until the day before the event.");
+            existing.IsDeleted = true;
+            existing.DeletedAt = DateTime.UtcNow;
+            existing.DeletedByUserId = actor.UserId;
 
-            if (organizerOnly)
-            {
-                if (existing.IsDeletionRequested)
-                    return (true, "Deletion request already pending approval.");
-
-                existing.IsDeletionRequested = true;
-                existing.DeletionRequestedAt = DateTime.UtcNow;
-                existing.DeletionRequestedByUserId = actor.UserId;
-
-                existing.IsApproved = false;
-                existing.ApprovedAt = null;
-                existing.ApprovedByUserId = null;
-
-                await db.SaveChangesAsync(ct);
-                return (true, "Deletion request submitted for approval.");
-            }
-
-            db.VolunteerOpportunities.Remove(existing);
             await db.SaveChangesAsync(ct);
             return (true, "Opportunity deleted.");
-        });
+        }, ct);
 
     public Task<(bool ok, string message)> ApproveAsync(int id, ActorContext actor, CancellationToken ct = default)
         => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
@@ -331,7 +330,13 @@ public sealed class OpportunityManagementService(DbGateway dbg)
             if (!actor.CanApprove)
                 return (false, "Not authorized.");
 
-            var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+            //var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            var existing = await db.VolunteerOpportunities
+                .Where(o => o.DeletedAt == null)   // Exclude deleted
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+
             if (existing is null) return (false, "Opportunity not found.");
 
             if (existing.IsApproved) return (true, "Already approved.");
@@ -342,7 +347,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
 
             await db.SaveChangesAsync(ct);
             return (true, "Opportunity approved.");
-        });
+        }, ct);
 
     public Task<(bool ok, string message)> UnapproveAsync(int id, ActorContext actor, CancellationToken ct = default)
         => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
@@ -350,7 +355,12 @@ public sealed class OpportunityManagementService(DbGateway dbg)
             if (!actor.CanApprove)
                 return (false, "Not authorized.");
 
-            var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+            //var existing = await db.VolunteerOpportunities.FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            var existing = await db.VolunteerOpportunities
+                .Where(o => o.DeletedAt == null)   // Exclude deleted
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
             if (existing is null) return (false, "Opportunity not found.");
 
             if (!existing.IsApproved) return (true, "Already pending.");
@@ -361,55 +371,55 @@ public sealed class OpportunityManagementService(DbGateway dbg)
 
             await db.SaveChangesAsync(ct);
             return (true, "Opportunity set to pending.");
-        });
+        }, ct);
 
-    public Task<(bool ok, string message)> ApproveDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
-        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
-        {
-            if (!actor.CanApprove)
-                return (false, "Not authorized.");
+    //public Task<(bool ok, string message)> ApproveDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
+    //    => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+    //    {
+    //        if (!actor.CanApprove)
+    //            return (false, "Not authorized.");
 
-            var existing = await db.VolunteerOpportunities
-                .FirstOrDefaultAsync(o => o.Id == id, ct);
+    //        var existing = await db.VolunteerOpportunities
+    //            .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-            if (existing is null)
-                return (false, "Opportunity not found.");
+    //        if (existing is null)
+    //            return (false, "Opportunity not found.");
 
-            if (!existing.IsDeletionRequested)
-                return (false, "No deletion request is pending for this opportunity.");
+    //        if (!existing.IsDeletionRequested)
+    //            return (false, "No deletion request is pending for this opportunity.");
 
-            if (HasEnded(existing))
-                return (false, "This opportunity has already ended and can no longer be deleted.");
+    //        if (HasEnded(existing))
+    //            return (false, "This opportunity has already ended and can no longer be deleted.");
 
-            db.VolunteerOpportunities.Remove(existing);
-            await db.SaveChangesAsync(ct);
+    //        db.VolunteerOpportunities.Remove(existing);
+    //        await db.SaveChangesAsync(ct);
 
-            return (true, "Deletion approved. Opportunity deleted.");
-        });
+    //        return (true, "Deletion approved. Opportunity deleted.");
+    //    }, ct);
 
-    public Task<(bool ok, string message)> RejectDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
-        => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
-        {
-            if (!actor.CanApprove)
-                return (false, "Not authorized.");
+    //public Task<(bool ok, string message)> RejectDeletionAsync(int id, ActorContext actor, CancellationToken ct = default)
+    //    => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
+    //    {
+    //        if (!actor.CanApprove)
+    //            return (false, "Not authorized.");
 
-            var existing = await db.VolunteerOpportunities
-                .FirstOrDefaultAsync(o => o.Id == id, ct);
+    //        var existing = await db.VolunteerOpportunities
+    //            .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-            if (existing is null)
-                return (false, "Opportunity not found.");
+    //        if (existing is null)
+    //            return (false, "Opportunity not found.");
 
-            if (!existing.IsDeletionRequested)
-                return (true, "No deletion request is pending for this opportunity.");
+    //        if (!existing.IsDeletionRequested)
+    //            return (true, "No deletion request is pending for this opportunity.");
 
-            existing.IsDeletionRequested = false;
-            existing.DeletionRequestedAt = null;
-            existing.DeletionRequestedByUserId = null;
+    //        existing.IsDeletionRequested = false;
+    //        existing.DeletionRequestedAt = null;
+    //        existing.DeletionRequestedByUserId = null;
 
-            await db.SaveChangesAsync(ct);
+    //        await db.SaveChangesAsync(ct);
 
-            return (true, "Deletion request rejected.");
-        });
+    //        return (true, "Deletion request rejected.");
+    //    }, ct);
 
     private static OpportunityRow MapRow(VolunteerOpportunity o)
     {
@@ -453,16 +463,28 @@ public sealed class OpportunityManagementService(DbGateway dbg)
         CancellationToken ct = default)
         => dbg.ExecuteAsync(async db =>
         {
+            //return await db.VolunteerOpportunities
+            //    .AsNoTracking()
+            //    .Include(o => o.Contact)
+            //    .ThenInclude(c => c.Address)
+            //    .Where(o => o.IsApproved)
+            //    .Where(o => !db.VolunteerSignups.Any(s =>
+            //        s.UserId == userId && s.VolunteerOpportunityId == o.Id))
+            //    .OrderBy(o => o.Date)
+            //    .ToListAsync(ct);
+
             return await db.VolunteerOpportunities
                 .AsNoTracking()
                 .Include(o => o.Contact)
                 .ThenInclude(c => c.Address)
+                .Where(o => o.DeletedAt == null)   // ✅ Exclude deleted
                 .Where(o => o.IsApproved)
                 .Where(o => !db.VolunteerSignups.Any(s =>
                     s.UserId == userId && s.VolunteerOpportunityId == o.Id))
                 .OrderBy(o => o.Date)
                 .ToListAsync(ct);
-        });
+
+        }, ct);
 
     public Task<(bool ok, string? error)> SignupAsync(
         int opportunityId,
@@ -470,9 +492,15 @@ public sealed class OpportunityManagementService(DbGateway dbg)
         CancellationToken ct = default)
         => dbg.ExecuteAsync<(bool ok, string? error)>(async db =>
         {
+            //var opp = await db.VolunteerOpportunities
+            //    .AsNoTracking()
+            //    .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
+
             var opp = await db.VolunteerOpportunities
                 .AsNoTracking()
+                .Where(o => o.DeletedAt == null)   // Exclude deleted
                 .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
+
 
             if (opp is null)
                 return (false, "Opportunity not found.");
@@ -504,5 +532,6 @@ public sealed class OpportunityManagementService(DbGateway dbg)
 
             await db.SaveChangesAsync(ct);
             return (true, null);
-        });
+        }, ct);
+
 }
