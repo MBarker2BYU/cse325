@@ -44,13 +44,13 @@
         </div>
 
         <div class="col-md-2 d-flex gap-2">
-            <button class="btn btn-primary" @onclick="Load" disabled="@m_Loading">Run</button>
+            <button class="btn btn-green-glass" @onclick="Load" disabled="@m_Loading">Run</button>
 
-            <button class="btn btn-outline-secondary" @onclick="Print" disabled="@m_Loading">
+            <button class="btn btn-green-glass" @onclick="Print" disabled="@(m_Loading || m_Rows.Count == 0)">
                 Print
             </button>
 
-            <button class="btn btn-outline-success"
+            <button class="btn btn-green-glass"
                     @onclick="ExportCsv"
                     disabled="@(m_Loading || m_Rows.Count == 0)">
                 CSV
