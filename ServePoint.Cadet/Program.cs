@@ -75,6 +75,9 @@ builder.Services.AddScoped<OpportunityManagementService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<VolunteerHoursReportService>();
 
+builder.Services
+    .AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 var app = builder.Build();
 

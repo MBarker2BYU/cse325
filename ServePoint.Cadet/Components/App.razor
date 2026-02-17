@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
+@using Microsoft.AspNetCore.Components.Web
 
 <head>
     <meta charset="utf-8" />
@@ -9,6 +10,7 @@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="css/sp-hud.css" />
+    <link rel="stylesheet" href="css/sp-print.css" />
     <link rel="stylesheet" href="@Assets["ServePoint.Cadet.styles.css"]" />
 
     <ImportMap />
@@ -17,7 +19,7 @@
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="RenderMode.InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="scripts/sp-script.js"></script>

@@ -131,25 +131,31 @@ public sealed class VolunteerHoursReportService(DbGateway dbg)
             return s;
         }
 
+        const string nl = "\r\n";
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("ServePoint Volunteer Hours Report");
-        sb.AppendLine($"Cadet,{Esc(report.HeaderName)}");
-        sb.AppendLine($"Email,{Esc(report.HeaderEmail)}");
-        sb.AppendLine($"From,{from:yyyy-MM-dd}");
-        sb.AppendLine($"To,{to:yyyy-MM-dd}");
-        sb.AppendLine();
-        sb.AppendLine("Date,Opportunity,Hours,Status");
 
-        //foreach (var r in report.Rows)
-        //    sb.AppendLine($"{r.Date:yyyy-MM-dd},{Esc(r.Title)},{r.Hours},{Esc(r.Status)}");
+        sb.Append("ServePoint Volunteer Hours Report").Append(nl);
+        sb.Append("Cadet,").Append(Esc(report.HeaderName)).Append(nl);
+        sb.Append("Email,").Append(Esc(report.HeaderEmail)).Append(nl);
+        sb.Append("From,").Append(from?.ToString("yyyy-MM-dd") ?? "").Append(nl);
+        sb.Append("To,").Append(to?.ToString("yyyy-MM-dd") ?? "").Append(nl);
+        sb.Append(nl);
+
+        sb.Append("Date,Opportunity,Hours,Status").Append(nl);
 
         foreach (var r in report.Rows)
-            sb.AppendLine($"{r.Date:yyyy-MM-dd},{Esc(r.Title)},{r.Hours},{Esc(r.Status)}");
+            sb.Append(r.Date.ToString("yyyy-MM-dd")).Append(',')
+                .Append(Esc(r.Title)).Append(',')
+                .Append(r.Hours).Append(',')
+                .Append(Esc(r.Status)).Append(nl);
 
-        sb.AppendLine();
-        sb.AppendLine($",Approved Total,{report.ApprovedTotalHours},");
-        sb.AppendLine($",Pending Total,{report.PendingTotalHours},");
-        return System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        sb.Append(nl);
+        sb.Append(",Approved Total,").Append(report.ApprovedTotalHours).Append(',').Append(nl);
+        sb.Append(",Pending Total,").Append(report.PendingTotalHours).Append(',').Append(nl);
+
+        // UTF-8 BOM helps Excel
+        var withBom = "\uFEFF" + sb.ToString();
+        return System.Text.Encoding.UTF8.GetBytes(withBom);
     }
 
     public record VolunteerHoursRow(DateTime Date, string Title, int Hours, string Status);

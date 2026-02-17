@@ -9,6 +9,7 @@
 @using Microsoft.JSInterop
 @using ServePoint.Cadet.Auth
 @using ServePoint.Cadet.Reports.Services
+@inject NavigationManager Nav
 
 @inject AuthenticationStateProvider AuthStateProvider
 @inject VolunteerHoursReportService Report
@@ -44,13 +45,13 @@
         </div>
 
         <div class="col-md-2 d-flex gap-2">
-            <button class="btn btn-green-glass" @onclick="Load" disabled="@m_Loading">Run</button>
+            <button type="button" class="btn btn-green-glass" @onclick="Load" disabled="@m_Loading">Run</button>
 
-            <button class="btn btn-green-glass" @onclick="Print" disabled="@(m_Loading || m_Rows.Count == 0)">
+            <button type="button" class="btn btn-green-glass" @onclick="Print" disabled="@(m_Loading || m_Rows.Count == 0)">
                 Print
             </button>
-
-            <button class="btn btn-green-glass"
+            
+            <button type="button" class="btn btn-green-glass"
                     @onclick="ExportCsv"
                     disabled="@(m_Loading || m_Rows.Count == 0)">
                 CSV
@@ -134,7 +135,7 @@ else
     private List<VolunteerHoursReportService.CadetPick> m_Cadets = new();
 
     // Prevent double-fire / concurrent loads (Blazor render + click, etc.)
-    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private readonly SemaphoreSlim m_LoadGate = new(1, 1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -167,7 +168,7 @@ else
     private async Task Load()
     {
         // non-reentrant
-        if (!await _loadGate.WaitAsync(0))
+        if (!await m_LoadGate.WaitAsync(0))
             return;
 
         try
@@ -204,7 +205,7 @@ else
         finally
         {
             m_Loading = false;
-            _loadGate.Release();
+            m_LoadGate.Release();
         }
     }
 
@@ -223,8 +224,9 @@ else
         await Js.InvokeVoidAsync(
             "spDownloadFile",
             $"ServePointHours_{DateTime.Now:yyyyMMdd_HHmm}.csv",
-            "text/csv",
+            "text/csv;charset=utf-8",
             Convert.ToBase64String(bytes));
+
     }
 
     private readonly Dictionary<string, object> m_FromAttributes = new()
@@ -236,5 +238,4 @@ else
     {
         ["id"] = "toDate"
     };
-
 }
