@@ -134,7 +134,7 @@ else
                                 <td>@o.Contact?.Name</td>
                                 <td class="text-muted">@o.Contact?.Address?.City</td>
                                 <td class="text-end text-nowrap">
-                                    <button class="btn btn-sm btn-primary"
+                                    <button class="btn btn-sm btn-green-glass"
                                             disabled="@m_Busy"
                                             @onclick="() => Signup(o.Id)">
                                         Sign Up
@@ -300,12 +300,12 @@ else
                                     <td class="text-muted">@s.DisplayName</td>
                                     <td class="text-muted">@((s.AttendanceSubmittedAt?.ToLocalTime().ToString("g")) ?? "")</td>
                                     <td class="text-end text-nowrap">
-                                        <button class="btn btn-sm btn-success"
+                                        <button class="btn btn-sm btn-green-glass"
                                                 disabled="@m_Busy"
                                                 @onclick="() => ApproveAttendance(s.Id)">
                                             Approve
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger ms-1"
+                                        <button class="btn btn-sm btn-red-glass ms-1"
                                                 disabled="@m_Busy"
                                                 @onclick="() => RejectAttendance(s.Id)">
                                             Reject
@@ -348,7 +348,7 @@ else
                                     <td>@o.Hours</td>
                                     <td class="text-muted">@o.Contact?.Name</td>
                                     <td class="text-end text-nowrap">
-                                        <a class="btn btn-sm btn-outline-primary"
+                                        <a class="btn btn-sm btn-green-glass" style="color: white !important;"
                                            href="opportunities/manage">
                                             Open
                                         </a>
