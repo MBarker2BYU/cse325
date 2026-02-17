@@ -109,7 +109,7 @@ ServePoint was evaluated using Google Lighthouse on the production deployment to
 |------|------------|--------------|----------------|-----|
 | Dashboard | 100 | 100 | 100 | 83 |
 | Opportunities | 100 | 100 | 100 | 83 |
-| User Management | 100 | 94–100 | 100 | 83 |
+| User Management | 100 | 100 | 100 | 83 |
 | Reporting | 99 | 100 | 77–96 | 83 |
 | Login | 100 | 100 | 96 | 82 |
 
