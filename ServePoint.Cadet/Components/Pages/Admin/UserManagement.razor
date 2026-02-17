@@ -124,7 +124,7 @@ else
 
                                         <!-- Right: role actions -->
                                         <div class="d-flex gap-2 align-items-center flex-wrap">
-                                            <select class="form-select form-select-sm" style="width: 160px"
+                                            <select class="form-select form-select-sm" style="width: 160px" aria-label="Add role"
                                                     @bind="r.SelectedRoleToAdd">
                                                 <option value="">Add role…</option>
                                                 @foreach (var role in GetAddableRoles(r))
@@ -139,7 +139,7 @@ else
                                                 Add
                                             </button>
 
-                                            <select class="form-select form-select-sm" style="width: 160px"
+                                            <select class="form-select form-select-sm" style="width: 160px" aria-label="Add role"
                                                     @bind="r.SelectedRoleToRemove">
                                                 <option value="">Remove role…</option>
                                                 @foreach (var role in GetRemovableRoles(r))
