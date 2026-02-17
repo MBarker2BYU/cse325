@@ -236,20 +236,22 @@ else
                                         </button>
                                     }
                                 }
-
-                                <button class="btn btn-sm btn-blue-glass ms-1"
-                                        title="@(locked ? "Organizers can only edit until the day before the event." : null)"
-                                        @onclick="() => OpenEditorAsync(row.Id)"
-                                        disabled="@(m_Busy || locked)">
-                                    Edit
-                                </button>
                                 
+                                @if (m_Actor is not null )
+                                {
+                                    <button class="btn btn-sm btn-blue-glass ms-1"
+                                            title="@(locked ? "Organizers can only edit until the day before the event." : null)"
+                                            @onclick="() => OpenEditorAsync(row.Id)"
+                                            disabled="@((m_Busy || locked) && !m_Actor.IsAdmin)">
+                                        Edit
+                                    </button>
+                                }
                                 @if (m_Actor is not null && m_Actor.CanApprove)
                                 {
                                     <button class="btn btn-sm btn-red-glass ms-1"
                                             title="@(locked ? "Organizers can only edit until the day before the event." : null)"
                                             @onclick="() => ConfirmAndDeleteAsync(row.Id, row.Title)"
-                                            disabled="@(m_Busy || locked)">
+                                            disabled="@((m_Busy || locked) && !m_Actor.IsAdmin)">
                                         Delete
                                     </button>
                                 }

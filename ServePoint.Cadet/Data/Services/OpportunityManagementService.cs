@@ -212,7 +212,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
 
         if (!ValidateTimes(input.StartTime, input.EndTime, out var timeError))
             return (false, timeError!);
-
+        
         return await dbg.ExecuteAsync(async db =>
         {
             //var existing = await db.VolunteerOpportunities
@@ -230,7 +230,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
             if (existing is null)
                 return (false, "Opportunity not found.");
 
-            if (HasEnded(existing))
+            if (HasEnded(existing) && !actor.IsAdmin)
                 return (false, "This opportunity has already ended and can no longer be edited.");
 
             var organizerOnly = actor is { IsOrganizer: true, IsInstructor: false, IsAdmin: false };
@@ -304,7 +304,7 @@ public sealed class OpportunityManagementService(DbGateway dbg)
     public Task<(bool ok, string message)> DeleteAsync(int id, ActorContext actor, CancellationToken ct = default)
         => dbg.ExecuteAsync<(bool ok, string message)>(async db =>
         {
-            if (!actor.AutoApprove)
+            if (!actor.IsAdmin)
                 return (false, "Not authorized.");
 
             var existing = await db.VolunteerOpportunities
