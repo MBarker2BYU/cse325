@@ -32,73 +32,7 @@ public sealed class DashboardService(DbGateway dbGateway)
     private static DateOnly TodayDateOnlyUtc() => DateOnly.FromDateTime(DateTime.UtcNow);
 
     private static DateOnly DateOnlyFromEventDate(DateTime eventDate) => DateOnly.FromDateTime(eventDate);
-
-    //public Task<DashboardData> LoadAsync(ActorContext actor, CancellationToken ct = default)
-    //    => dbGateway.ExecuteAsync(async db =>
-    //    {
-    //        // My signups (always)
-    //        var mySignups = await db.VolunteerSignups
-    //            .AsNoTracking()
-    //            .Where(s => s.UserId == actor.UserId)
-    //            .Include(s => s.VolunteerOpportunity)
-    //                .ThenInclude(o => o.Contact)
-    //                    .ThenInclude(c => c.Address)
-    //            .OrderByDescending(s => s.SignedUpAt)
-    //            .ToListAsync(ct);
-
-    //        var approvedHours = 0;
-    //        var approvedCount = 0;
-
-    //        if (actor.AccruesHours)
-    //        {
-    //            // Compute from loaded graph (fine)
-    //            approvedHours = mySignups
-    //                .Where(s => s.AttendanceApproved)
-    //                .Sum(s => s.VolunteerOpportunity.Hours);
-
-    //            approvedCount = mySignups.Count(s => s.AttendanceApproved);
-    //        }
-
-    //        // Upcoming = signed up, not approved yet, and event date is today or later
-    //        var today = TodayDateOnlyUtc();
-    //        var upcomingSignedUp = mySignups.Count(s =>
-    //            !s.AttendanceApproved &&
-    //            DateOnlyFromEventDate(s.VolunteerOpportunity.Date) >= today);
-
-    //        // Approval queues (Instructor/Admin)
-    //        var pendingOpps = new List<VolunteerOpportunity>();
-    //        var pendingAttendance = new List<VolunteerSignup>();
-
-    //        if (actor.CanApprove)
-    //        {
-    //            pendingOpps = await db.VolunteerOpportunities
-    //                .AsNoTracking()
-    //                .Include(o => o.Contact)
-    //                    .ThenInclude(c => c.Address)
-    //                .Where(o => !o.IsApproved)
-    //                .OrderBy(o => o.Date)
-    //                .ToListAsync(ct);
-
-    //            pendingAttendance = await db.VolunteerSignups
-    //                .AsNoTracking()
-    //                .Include(s => s.VolunteerOpportunity)
-    //                    .ThenInclude(o => o.Contact)
-    //                .Where(s => s.AttendanceSubmitted && !s.AttendanceApproved)
-    //                .OrderBy(s => s.SignedUpAt)
-    //                .ToListAsync(ct);
-    //        }
-
-    //        return new DashboardData(
-    //            Actor: actor,
-    //            TotalApprovedHours: approvedHours,
-    //            TotalApprovedCount: approvedCount,
-    //            UpcomingSignedUpCount: upcomingSignedUp,
-    //            MySignups: mySignups,
-    //            PendingOpportunities: pendingOpps,
-    //            PendingAttendance: pendingAttendance
-    //        );
-    //    }, ct);
-
+    
     public Task<DashboardData> LoadAsync(ActorContext actor, CancellationToken ct = default)
     => dbGateway.ExecuteAsync(async db =>
     {
@@ -155,14 +89,45 @@ public sealed class DashboardService(DbGateway dbGateway)
                 .OrderBy(o => o.Date)
                 .ToListAsync(ct);
 
+            //pendingAttendance = await db.VolunteerSignups
+            //    .AsNoTracking()
+            //    .Include(s => s.VolunteerOpportunity)
+            //    .ThenInclude(o => o.Contact)
+            //    .Where(s => s.AttendanceSubmitted && !s.AttendanceApproved)
+            //    .Where(s => s.VolunteerOpportunity.DeletedAt == null)
+            //    .OrderBy(s => s.SignedUpAt)
+            //    .ToListAsync(ct);
+
             pendingAttendance = await db.VolunteerSignups
                 .AsNoTracking()
                 .Include(s => s.VolunteerOpportunity)
-                    .ThenInclude(o => o.Contact)
+                .ThenInclude(o => o.Contact)
                 .Where(s => s.AttendanceSubmitted && !s.AttendanceApproved)
                 .Where(s => s.VolunteerOpportunity.DeletedAt == null)
                 .OrderBy(s => s.SignedUpAt)
+                .Select(s => new VolunteerSignup
+                {
+                    Id = s.Id,
+                    VolunteerOpportunityId = s.VolunteerOpportunityId,
+                    UserId = s.UserId,
+                    SignedUpAt = s.SignedUpAt,
+                    AttendanceSubmitted = s.AttendanceSubmitted,
+                    AttendanceSubmittedAt = s.AttendanceSubmittedAt,
+                    AttendanceApproved = s.AttendanceApproved,
+                    AttendanceApprovedAt = s.AttendanceApprovedAt,
+                    ApprovedByUserId = s.ApprovedByUserId,
+                    VolunteerOpportunity = s.VolunteerOpportunity,
+
+                    // 🔹 Pull from Identity table
+                    DisplayName = db.Users
+                        .Where(u => u.Id == s.UserId)
+                        .Select(u => u.DisplayName)
+                        .FirstOrDefault()
+                })
                 .ToListAsync(ct);
+
+
+
         }
 
         return new DashboardData(

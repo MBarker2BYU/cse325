@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ServePoint.Cadet.Models.Entities;
 
@@ -21,6 +22,8 @@ public class VolunteerSignup
     public DateTime? AttendanceApprovedAt { get; set; }
     public string? ApprovedByUserId { get; set; }
 
+    [NotMapped]
+    public string? DisplayName { get; set; }
 
     // Navigation
     public VolunteerOpportunity VolunteerOpportunity { get; set; } = null!;

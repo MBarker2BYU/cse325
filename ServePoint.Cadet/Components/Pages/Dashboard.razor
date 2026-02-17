@@ -297,7 +297,7 @@ else
                                 <tr>
                                     <td class="fw-semibold">@s.VolunteerOpportunity.Title</td>
                                     <td>@s.VolunteerOpportunity.Date.ToShortDateString()</td>
-                                    <td class="text-muted">@s.UserId</td>
+                                    <td class="text-muted">@s.DisplayName</td>
                                     <td class="text-muted">@((s.AttendanceSubmittedAt?.ToLocalTime().ToString("g")) ?? "")</td>
                                     <td class="text-end text-nowrap">
                                         <button class="btn btn-sm btn-success"
@@ -571,5 +571,5 @@ else
             : $"{m_Data.TotalApprovedHours} / {m_RequiredHours} hours";
 
     private string ProgressWidthStyle => $"width: {ProgressPercent}%";
-
+    
 }
