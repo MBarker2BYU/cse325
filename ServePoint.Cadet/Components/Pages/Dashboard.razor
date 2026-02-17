@@ -39,7 +39,7 @@ else
     @* ===== Summary Cards ===== *@
     <div class="row g-3 mb-3">
 
-        @if (m_Data.Actor.AccruesHours)
+        @if (!m_Data.Actor.CanApprove)
         {
             <div class="col-md-4">
                 <div class="card sp-card shadow-sm">
@@ -72,7 +72,7 @@ else
     </div>
 
     @* ===== Progress (Users/Organizers only) ===== *@
-    @if (m_Data.Actor.AccruesHours)
+    @if (!m_Data.Actor.CanApprove)
     {
         <div class="sp-progress-shell mb-3">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -99,7 +99,7 @@ else
     }
 
     @* ===== Available Opportunities (Users/Organizers only) ===== *@
-    @if (m_Data is not null && m_Data.Actor.AccruesHours)
+    @if (m_Data is not null && !m_Data.Actor.CanApprove)
     {
         <h2 class="h5 mt-4">Available Opportunities</h2>
 
