@@ -12,6 +12,10 @@ using ServePoint.Cadet.Diagnostics;
 using ServePoint.Cadet.Reports.Services;
 using System.Text;
 
+using System.Security.Claims;
+using QuestPDF.Infrastructure;
+using ServePoint.Cadet.Reports;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Razor / Blazor
@@ -78,6 +82,8 @@ builder.Services.AddScoped<VolunteerHoursReportService>();
 
 var app = builder.Build();
 
+QuestPDF.Settings.License = LicenseType.Community;
+
 //Production Issues
 var options = new ForwardedHeadersOptions()
 {
@@ -119,6 +125,29 @@ app.MapGet("/_diag/last-error", () =>
     sb.AppendLine(ProductionDiagnostics.LastError);
     return Results.Text(sb.ToString(), "text/plain");
 });
+
+// Reports
+app.MapGet("/reports/hours/pdf",
+        async (HttpContext http,
+            VolunteerHoursReportService reportSvc,
+            string userId,
+            DateTime? from,
+            DateTime? to,
+            CancellationToken ct) =>
+        {
+            var requesterId = http.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                              ?? throw new InvalidOperationException("No requester id.");
+
+            var report = await reportSvc.GetReportAsync(requesterId, userId, from, to, ct);
+
+            var pdfBytes = ServePoint.Cadet.Reports.VolunteerHoursToPDF.Build(report,from, to);
+
+            return Results.File(
+                pdfBytes,
+                "application/pdf",
+                $"ServePointHours_{DateTime.UtcNow:yyyyMMdd_HHmm}.pdf");
+        })
+    .RequireAuthorization();
 
 
 // Pipeline

@@ -17,6 +17,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject VolunteerHoursReportService Report
 @inject IJSRuntime Js
+@inject NavigationManager Nav
+
 
 <PageTitle>Volunteer Hours Report</PageTitle>
 
@@ -50,9 +52,16 @@
         <div class="col-md-2 d-flex gap-2">
             <button class="btn btn-green-glass" @onclick="Load" disabled="@m_Loading">Run</button>
 
-            <button class="btn btn-green-glass" @onclick="Print" disabled="@(m_Loading || m_Rows.Count == 0)">
+           @*  <button class="btn btn-green-glass" @onclick="Print" disabled="@(m_Loading || m_Rows.Count == 0)">
                 Print
+            </button> *@
+            
+            <button type="button" class="btn btn-green-glass"
+                    @onclick="DownloadPdf"
+                    disabled="@(m_Loading || m_Rows.Count == 0)">
+                PDF
             </button>
+
 
             <button class="btn btn-green-glass"
                     @onclick="ExportCsv"
@@ -240,5 +249,21 @@ else
     {
         ["id"] = "toDate"
     };
+
+    private void DownloadPdf()
+    {
+        if (string.IsNullOrWhiteSpace(m_SelectedUserId)) return;
+
+        var from = m_From?.ToString("yyyy-MM-dd");
+        var to = m_To?.ToString("yyyy-MM-dd");
+
+        var url =
+            $"/reports/hours/pdf?userId={Uri.EscapeDataString(m_SelectedUserId)}" +
+            (from is null ? "" : $"&from={Uri.EscapeDataString(from)}") +
+            (to is null ? "" : $"&to={Uri.EscapeDataString(to)}");
+
+        Nav.NavigateTo(url, forceLoad: true);
+    }
+
 
 }
