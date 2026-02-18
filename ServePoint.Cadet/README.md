@@ -146,25 +146,25 @@ Accessibility considerations include:
 Images are located in the `/docs` directory of the repository.
 
 ### Login
-![Login](docs/Login.png)
+![Login](Docs/Login.png)
 
 ### Dashboard
-![Dashboard](docs/Dashboard.png)
+![Dashboard](Docs/Dashboard.png)
 
 ### Mobile Dashboard
-![Mobile Dashboard](docs/Mobile-Dashboard.png)
+![Mobile Dashboard](Docs/Mobile-Dashboard.png)
 
 ### Opportunity Management
-![Opportunity Management](docs/Opportunity-Management.png)
+![Opportunity Management](Docs/Opportunity-Management.png)
 
 ### User Management
-![User Management](docs/User-Management.png)
+![User Management](Docs/User-Management.png)
 
 ### Volunteer Report (Desktop)
-![Printing](docs/Printing.png)
+![Printing](Docs/Printing.png)
 
 ### Volunteer Report (Mobile)
-![Mobile Print](docs/Mobile-Print.png)
+![Mobile Print](Docs/Mobile-Print.png)
 
 - 
 ---
