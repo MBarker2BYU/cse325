@@ -23,28 +23,28 @@
     <div class="sp-navscroll">
         <nav class="nav flex-column">
             <AuthorizeView>
-                
+
                 <Authorized>
                     <NavLink class="nav-link sp-nav-link" href="/dashboard">
                         <span class="bi bi-clipboard-check-nav-menu" aria-hidden="true"></span>
                         Dashboard
                     </NavLink>
                 </Authorized>
-                
+
             </AuthorizeView>
-            
+
             <AuthorizeView Roles="@($"{Roles.Organizer},{Roles.Instructor},{Roles.Admin}")">
 
                 <Authorized>
-                    
+
                     <NavLink class="nav-link sp-nav-link" href="/opportunities/manage">
                         <span class="bi bi-speedometer2-nav-menu" aria-hidden="true"></span>
                         Opportunity Management
                     </NavLink>
                 </Authorized>
-                
+
             </AuthorizeView>
-            
+
             <AuthorizeView Roles="@($"{Roles.Admin}")">
 
                 <Authorized>
@@ -58,7 +58,7 @@
             </AuthorizeView>
 
             <AuthorizeView>
-                
+
                 <Authorized>
                     <NavLink class="nav-link sp-nav-link" href="/reports/hours">
                         <span class="bi bi-printer-fill-nav-menu" aria-hidden="true"></span>
@@ -87,14 +87,14 @@
 
         </nav>
     </div>
-    
-    
+
+
 
     <!-- LOCKED BOTTOM AREA (NO SCROLL) -->
     <div class="sp-sidebar-bottom">
 
         <AuthorizeView Context="auth">
-            
+
             <Authorized>
                 <a class="sp-usercard-link" href="/Account/Manage" onclick="event.stopPropagation();">
                     <div class="sp-usercard sp-usercard-big">
@@ -114,13 +114,14 @@
             </Authorized>
 
         </AuthorizeView>
-        
+
         <div class="sp-sidebar-footer" onclick="event.stopPropagation();">
             <NavLink href="about" class="nav-link">About</NavLink>
         </div>
-
+        <div class="sp-nav-footer-copyright">
+            © 2026 Matthew D. Barker
+        </div>
     </div>
-
 </div>
 
 @code {

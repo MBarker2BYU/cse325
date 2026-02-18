@@ -828,3 +828,24 @@ input[type="date"] {
 input[type="time"] {
     color-scheme: dark;
 }
+
+.sp-login-logo {
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    display: inline-block;
+}
+
+.sp-nav-footer-copyright {
+    text-align: center;
+    padding: 0.75rem 0;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.75);
+}
+
+.sp-sidebar-bottom {
+    text-align: center;
+}
+
+
+
