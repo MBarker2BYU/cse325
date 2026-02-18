@@ -212,9 +212,9 @@ https://github.com/MBarker2BYU/ServerPoint
 
 ## Demonstration Video
 
-Group Demonstration Video (~5–7 minutes):
+Group Demonstration Video length: 5:20:
 
-[Software Demo Video](http://youtube.link.goes.here)
+[Software Demo Video] https://youtu.be/fxedl0iTMXo
 
 The video demonstrates:
 
